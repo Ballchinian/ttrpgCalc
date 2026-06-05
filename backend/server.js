@@ -18,8 +18,19 @@ import authRoutes from "./routes/authRoutes.js";
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const allowedOrigins = [
+    FRONTEND_BASE_URL,
+    "http://localhost:3000",
+    "http://localhost:5173",
+].filter(Boolean);
+
+console.log("Allowed CORS origins:", allowedOrigins);
+
 app.use(cors({
-    origin: FRONTEND_BASE_URL,
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+    },
     credentials: true
 }));
 //50 KB cap prevents oversized battle payloads
