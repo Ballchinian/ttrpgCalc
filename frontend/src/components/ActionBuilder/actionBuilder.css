@@ -1,0 +1,19 @@
+li {
+    margin:25px;
+}
+
+ol {
+    margin:auto;
+    padding:0;
+}
+
+
+.card {
+    display:flex;
+    flex-direction: column;
+    padding:20px;
+}
+
+input {
+    width: 100%;
+}

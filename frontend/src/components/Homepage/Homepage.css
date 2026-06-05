@@ -1,0 +1,62 @@
+
+.card-img-top {
+    margin: auto;
+    width: 15rem;
+    height: 100%;
+    object-fit: contain;
+}
+
+/*height for .card needed to keep all of them the same size*/
+.card {
+    width:18rem;
+    background-color: #091629;
+    height:100%;
+
+}.card:hover {
+    transform: scale(1.05);
+    transition: transform 0.3s;
+    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+}
+
+.card-body {
+    
+    text-align: center;
+}
+
+p {
+    margin-bottom: 200px;
+}
+
+
+/*Responsive design, main three links get reduced in size and line up vertically */
+ @media (max-width:800px){
+      .card-img-top {
+        width:5rem;
+      }
+    div #mainLinks {
+        flex-direction: column; 
+        align-items: center;
+    }
+    .card {
+        margin-bottom: 20px;
+    }
+}
+
+/*For all images in my program*/
+img {
+    object-fit: contain;
+}
+
+button {
+    margin-top:20px;
+    width:100%;
+}
+
+h2 {
+    margin-bottom: 30px;
+}
+
+Dropdown.Item {
+    width:100%;
+}
