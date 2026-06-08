@@ -23,6 +23,28 @@ const STAT_TOOLTIPS = {
     dexHit: "Your total ranged attack bonus, compared against the target's AC. Also used for finesse weapons when higher than STR Hit. Enter the final value including all bonuses.",
 };
 
+//The form keeps stats flat for simple inputs; the stored model is namespaced (Foundry-aligned:
+//attributes / saves / perception / skills). Map between the two only at the load/save boundary.
+const toNamespacedStats = (flat) => {
+    const { perception = 0, ...skills } = flat.skills ?? {};
+    return {
+        attributes: { ac: flat.ac, dc: flat.dc, hp: flat.health, str: flat.str, strHit: flat.strHit, dexHit: flat.dexHit },
+        saves: { fortitude: flat.fortitude, reflex: flat.reflex, will: flat.will },
+        perception,
+        skills,
+    };
+};
+const fromNamespacedStats = (stats) => {
+    const a = stats?.attributes ?? {};
+    const s = stats?.saves ?? {};
+    return {
+        ac: a.ac ?? 0, dc: a.dc ?? 0, str: a.str ?? 0, strHit: a.strHit ?? 0, dexHit: a.dexHit ?? 0,
+        health: a.hp ?? 0,
+        fortitude: s.fortitude ?? 0, reflex: s.reflex ?? 0, will: s.will ?? 0,
+        skills: { perception: stats?.perception ?? 0, ...(stats?.skills ?? {}) },
+    };
+};
+
 function CharacterDesign() {
     const navigate = useNavigate();
     
@@ -96,11 +118,8 @@ function CharacterDesign() {
                     const char = data.find(c => c._id === characterID);
                     if (char) {
                         setCharacterName(char.characterName);
-                        setCharacterStats(prev => ({
-                            ...prev,
-                            ...char.stats,
-                            skills: { ...prev.skills, ...(char.stats?.skills ?? {}) },
-                        }));
+                        const flat = fromNamespacedStats(char.stats);
+                        setCharacterStats(prev => ({ ...prev, ...flat, skills: { ...prev.skills, ...flat.skills } }));
                         setImgUrl(char.image);
                         setResistances(char.resistances ?? []);
                         setWeaknesses(char.weaknesses ?? []);
@@ -166,7 +185,7 @@ function CharacterDesign() {
         //Create the character object to send to backend
         const characterData = {
             characterName,
-            stats: characterStats,
+            stats: toNamespacedStats(characterStats),
             image: imgUrl,
             resistances,
             weaknesses,
@@ -183,6 +202,9 @@ function CharacterDesign() {
                 if (!res.ok) { setErrors({ server: "Failed to save character. Please try again." }); return; }
                 const saved = await res.json();
                 setCharacterStorage(prev => [...prev, saved]);
+                //Add to the shared store so the new character is immediately selectable in the
+                //battle's Add Hero/Add Foe lists without a page reload (game data fetches only once)
+                useGameDataStore.getState().upsertCharacter(saved);
             } else {
                 const res = await apiFetch(`${BACKEND_BASE_URL}/characters/${characterID}`, {
                     method: "PUT",

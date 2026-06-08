@@ -6,10 +6,10 @@ export function buildRecapEntry(actorName, actionName, actorEffects, targetsBefo
     //Track which conditions were newly applied this action for the action recap
     const conditionsApplied = updatedTargets.flatMap(updated => {
         const before = targetsBefore.find(t => t.id === updated.id);
-        const beforeKeys = new Set((before?.effects ?? []).map(e => `${e.name}:${e.number ?? 0}`));
+        const beforeKeys = new Set((before?.effects ?? []).map(e => `${e.slug}:${e.value ?? 0}`));
         return (updated.effects ?? [])
-            .filter(e => !beforeKeys.has(`${e.name}:${e.number ?? 0}`))
-            .map(e => ({ targetName: updated.name, conditionName: e.name, level: e.number ?? 1 }));
+            .filter(e => !beforeKeys.has(`${e.slug}:${e.value ?? 0}`))
+            .map(e => ({ targetName: updated.name, conditionName: e.slug, level: e.value ?? 1 }));
     });
 
     const targets = updatedTargets.map(updated => {
@@ -26,14 +26,26 @@ export function buildRecapEntry(actorName, actionName, actorEffects, targetsBefo
 
         const damageTaken = Math.max(0, prevHealth - newHealth);
         const healingReceived = Math.max(0, newHealth - prevHealth);
-        //luckDelta: how far above/below expected this roll landed (luck mode only)
-        const luckDelta = rollOutcome.avgDamage !== undefined ? damageTaken - rollOutcome.avgDamage : null;
-        const healingLuckDelta = rollOutcome.avgHealing !== undefined ? healingReceived - rollOutcome.avgHealing : null;
+        const wasKilled = prevHealth > 0 && newHealth <= 0 && damageTaken > 0;
+
+        //luckDelta: how far above/below expected this roll landed (luck mode only).
+        //Use the UNCAPPED rolled amount (rawDamage/rawHealing) so overkill/over-heal isn't misread
+        //as "unlucky" — capped HP change would understate a high roll that was partly wasted.
+        const maxHealth = updated.stats?.maxHealth ?? Infinity;
+        const rolledDamage = stats.rawDamage ?? damageTaken;
+        const rolledHealing = stats.rawHealing ?? healingReceived;
+        //A hit on an already-dead target (or a heal on a full-HP target) does nothing real, so it
+        //carries no luck. damageTaken>0 in ignoreHP mode (theoretical), so theorycrafting still counts.
+        const wastedOnDead = prevHealth <= 0 && damageTaken === 0;
+        const wastedOnFull = prevHealth >= maxHealth && healingReceived === 0;
+        const luckDelta = (rollOutcome.avgDamage !== undefined && !wastedOnDead) ? rolledDamage - rollOutcome.avgDamage : null;
+        const healingLuckDelta = (rollOutcome.avgHealing !== undefined && !wastedOnFull) ? rolledHealing - rollOutcome.avgHealing : null;
 
         return {
             name: updated.name,
             damageTaken,
             healingReceived,
+            wasKilled,
             conditionImpacts: stats.conditionImpacts ?? [],
             offGuardImpacts: stats.offGuardImpacts ?? [],
             perConditionImpacts: stats.perConditionImpacts ?? [],
@@ -77,5 +89,6 @@ export function buildRecapEntry(actorName, actionName, actorEffects, targetsBefo
         totalOffGuardGain,
         conditionBreakdown,
         conditionsApplied,
+        critSpecImpacts: [], //filled in later by crit spec prompts (see critSpecPrompts.js)
     };
 }

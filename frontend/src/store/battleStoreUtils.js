@@ -14,8 +14,10 @@ export function createBattleCharacter(char, side, displayName) {
         actionsRemaining: [true, true, true],
         stats: {
             ...char.stats,
-            maxHealth: char.stats.health,
-            currentHealth: char.stats.health,
+            //Optional chaining guards against pre-namespacing characters so they degrade to 0 HP
+            //(prompting a re-save) instead of crashing the battle UI
+            maxHealth: char.stats.attributes?.hp ?? 0,
+            currentHealth: char.stats.attributes?.hp ?? 0,
         },
         resistances: char.resistances ?? [],
         weaknesses: char.weaknesses ?? [],

@@ -33,6 +33,8 @@ export const resolveActionHelper = (tempActiveActor, tempTargetCharacters, actio
             switch (effect.type) {
                 case "damage": {
                     if (!affectedChar) break;
+                    //Persistent damage creates a condition handled below; no immediate HP loss on application (PF2e rule)
+                    if (effect.category === "persistent") break;
                     if (diceMode === "luck") {
                         //Roll dice and capture individual results for the hover tooltip.
                         //effect.multiplier may be undefined for automatic actions; default to 1x.
@@ -59,7 +61,7 @@ export const resolveActionHelper = (tempActiveActor, tempTargetCharacters, actio
                 }
                 case "healing": {
                     if (!affectedChar) break;
-                    const maxHealth = affectedChar.stats.maxHealth ?? affectedChar.stats.health ?? 0;
+                    const maxHealth = affectedChar.stats.maxHealth ?? affectedChar.stats.attributes?.hp ?? 0;
                     if (diceMode === "luck") {
                         //Roll dice and capture individual results for the hover tooltip.
                         //effect.multiplier may be undefined for automatic actions; default to 1x.
@@ -129,26 +131,29 @@ export const resolveActionHelper = (tempActiveActor, tempTargetCharacters, actio
                 );
             }
 
-            //Auto-apply persistent damage conditions from effects flagged persistent:true
+            //Auto-apply persistent damage conditions from effects with category "persistent"
             //Immune targets skip entirely; resistance/weakness handled each round by endRound
-            for (const e of target.effects.filter(ef => ef.type === "damage" && ef.persistent === true && ef.damageType)) {
+            for (const e of target.effects.filter(ef => ef.type === "damage" && ef.category === "persistent" && ef.damageType)) {
                 const type = e.damageType.toLowerCase().trim();
                 if ((affectedChar.immunities ?? []).some(i => i.toLowerCase() === type)) continue;
                 const mult = diceMode === "luck" ? (e.multiplier ?? 1) : 1;
-                const amount = Math.max(1, Math.round(avgOfDice(e.number, mult)));
+                //Luck mode: roll actual dice; avg/choose: use average
+                const amount = diceMode === "luck"
+                    ? Math.max(1, sumOfDice(e.number, mult))
+                    : Math.max(1, Math.round(avgOfDice(e.number, mult)));
                 const fullName = `persistent ${type}`;
-                const existing = (affectedChar.effects || []).find(ef => ef.name === fullName);
+                const existing = (affectedChar.effects || []).find(ef => ef.slug === fullName);
                 if (existing) {
                     //PF2e: same damage type doesn't stack — keep the higher amount
-                    if (amount > existing.number) {
+                    if (amount > existing.value) {
                         affectedChar = { ...affectedChar, effects: (affectedChar.effects || []).map(ef =>
-                            ef.name === fullName ? { ...ef, number: amount } : ef
+                            ef.slug === fullName ? { ...ef, value: amount } : ef
                         )};
                         updatedChars[target.id] = affectedChar;
                     }
                 } else {
                     affectedChar = { ...affectedChar, effects: [...(affectedChar.effects || []),
-                        { name: fullName, number: amount, damageType: type, duration: { type: "flatCheck" } }
+                        { slug: fullName, value: amount, damageType: type, duration: { type: "flatCheck" } }
                     ]};
                     updatedChars[target.id] = affectedChar;
                 }
@@ -175,13 +180,16 @@ export const resolveActionHelper = (tempActiveActor, tempTargetCharacters, actio
                         return { ...eff, resolvedValue: applyDamageModifiers(eff.resolvedValue, eff.damageType, charRef ?? {}) };
                     });
                     //Add persistent condition effects for outcomes that deal damage
-                    const mult = multTable[key] ?? 0;
-                    const persistAdd = mult > 0
+                    const tableMult = multTable[key] ?? 0;
+                    const persistAdd = tableMult > 0
                         ? effects
-                            .filter(eff => eff.type === "damage" && eff.persistent === true && eff.damageType)
+                            .filter(eff => eff.type === "damage" && eff.category === "persistent" && eff.damageType)
                             .flatMap(eff => {
                                 const type = eff.damageType.toLowerCase().trim();
                                 if ((charRef?.immunities ?? []).some(i => i.toLowerCase() === type)) return [];
+                                //Respect explicit multiplier:1 on crit-spec effects so they don't get 2× for criticalSuccess
+                                const mult = eff.multiplier != null ? eff.multiplier : tableMult;
+                                if (mult <= 0) return [];
                                 const amount = Math.max(1, Math.round(avgOfDice(eff.number, mult)));
                                 return [{ type: "addCondition", condition: `persistent ${type}`, adjustBy: amount, damageType: type, duration: { type: "flatCheck" } }];
                             })

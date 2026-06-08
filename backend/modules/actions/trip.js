@@ -9,7 +9,7 @@ export default {
         reverseOutcome: false,
     },
     outcomes: {
-        critSuccess: {
+        criticalSuccess: {
             text: "The target falls, lands prone, and takes 1d6 bludgeoning damage.",
             effects: [
                 { type: "addCondition", condition: "prone", duration: { type: "manual" }, target: "targetCharacters" },
@@ -24,7 +24,7 @@ export default {
             text: "You fail to trip the target.",
             effects: []
         },
-        critFailure: {
+        criticalFailure: {
             text: "You lose your balance, fall, and land prone.",
             effects: [{ type: "addCondition", condition: "prone", duration: { type: "manual" }, target: "activeActor" }]
         }

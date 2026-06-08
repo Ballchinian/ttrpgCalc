@@ -9,7 +9,7 @@ export default {
         reverseOutcome: false,
     },
     outcomes: {
-        critSuccess: {
+        criticalSuccess: {
             text: "The target becomes frightened 2.",
             effects: [
                 { type: "addCondition", condition: "frightened", adjustBy: 2, duration: { type: "decrement" }, target: "targetCharacters" }
@@ -25,7 +25,7 @@ export default {
             text: "You fail to frighten the target.",
             effects: []
         },
-        critFailure: {
+        criticalFailure: {
             text: "You critically fail. You become frightened 1.",
             effects: [
                 { type: "addCondition", condition: "frightened", adjustBy: 1, duration: { type: "decrement" }, target: "activeActor" }

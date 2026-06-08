@@ -54,12 +54,12 @@ function CharacterCard({ character }) {
     const damageTypes = useGameDataStore(state => state.damageTypes);
 
     const getEffectDescription = (effect) => {
-        if (effect.name.startsWith("persistent ")) {
-            const type = effect.damageType ?? effect.name.replace("persistent ", "");
-            return `At the end of each round, you take ${effect.number} ${type} damage. Attempt a DC 15 flat check to end this condition.`;
+        if (effect.slug.startsWith("persistent ")) {
+            const type = effect.damageType ?? effect.slug.replace("persistent ", "");
+            return `At the end of each round, you take ${effect.value} ${type} damage. Attempt a DC 15 flat check to end this condition.`;
         }
-        const info = globalEffects?.find(e => e.name.toLowerCase() === effect.name.toLowerCase());
-        return info?.description || effect.description || effect.name;
+        const info = globalEffects?.find(e => e.name.toLowerCase() === effect.slug.toLowerCase());
+        return info?.description || effect.description || effect.slug;
     };
 
     const maxHealth = character?.stats?.maxHealth ?? 0;
@@ -138,14 +138,14 @@ function CharacterCard({ character }) {
                     <div className="mt-2">
                         <div style={effectListStyle}>
                             {character.effects.map((effect) => (
-                                <OverlayTrigger key={effect.name} placement="top" overlay={<Tooltip>{getEffectDescription(effect)}</Tooltip>}>
+                                <OverlayTrigger key={effect.slug} placement="top" overlay={<Tooltip>{getEffectDescription(effect)}</Tooltip>}>
                                     <div
                                         onClick={e => { e.stopPropagation(); card.handleChangedEffect(effect); }}
                                         style={effectBadgeStyle}
                                         onMouseEnter={e => { e.currentTarget.style.color = "#28a745"; e.currentTarget.style.transform = "scale(1.05)"; }}
                                         onMouseLeave={e => { e.currentTarget.style.color = ""; e.currentTarget.style.transform = "scale(1)"; }}
                                     >
-                                        {effect.name}{(effect.number > 1 || effect.name.startsWith("persistent ")) && effect.name !== OFF_GUARD ? ` (${effect.number})` : ""}
+                                        {effect.slug}{(effect.value > 1 || effect.slug.startsWith("persistent ")) && effect.slug !== OFF_GUARD ? ` (${effect.value})` : ""}
                                         {effect.duration?.type === "rounds"       && <span style={durationLabelStyle}> [{effect.duration.remaining}r]</span>}
                                         {effect.duration?.type === "endOfRound"   && <span style={durationLabelStyle}> [eor]</span>}
                                         {effect.duration?.type === "currentTurn"  && <span style={durationLabelStyle}> [this turn]</span>}
@@ -161,7 +161,7 @@ function CharacterCard({ character }) {
                     <div className="mt-2" onClick={e => e.stopPropagation()}>
                         {card.stackEdit.isPersistent ? (
                             <>
-                                <div style={stackLevelLabelStyle}>{card.stackEdit.effect.name}: Amount (0 = delete)</div>
+                                <div style={stackLevelLabelStyle}>{card.stackEdit.effect.slug}: Amount (0 = delete)</div>
                                 <div className="d-flex gap-1 align-items-center mb-2">
                                     <input
                                         type="number" value={card.stackEdit.inputValue} min={0} max={card.MAX_STACK} autoFocus
@@ -183,7 +183,7 @@ function CharacterCard({ character }) {
                             </>
                         ) : (
                             <>
-                                <div style={stackLevelLabelStyle}>{card.stackEdit.effect.name}: Level (0 = delete)</div>
+                                <div style={stackLevelLabelStyle}>{card.stackEdit.effect.slug}: Level (0 = delete)</div>
                                 <div className="d-flex gap-1 align-items-center mb-2">
                                     <input
                                         type="number" value={card.stackEdit.inputValue} min={0} max={card.MAX_STACK} autoFocus

@@ -64,8 +64,9 @@ export const avgOfDice = ({ numRolled, diceRolled, modifier, bonusDice }, multip
 
 export const diceFormat = ({ numRolled, diceRolled, modifier, bonusDice }) => {
     const bonusStr = bonusDice ? `+${bonusDice.numRolled}d${bonusDice.diceRolled}` : "";
-    //undefined/null modifier treated as 0 so the display string is never "undefined"
     const safeMod = Number.isFinite(modifier) ? modifier : 0;
     const mod = safeMod > 0 ? `+${safeMod}` : safeMod < 0 ? `${safeMod}` : "";
+    //numRolled=0 means flat modifier only (no dice component)
+    if (numRolled === 0) return `${safeMod}${bonusStr}`;
     return `${numRolled}d${diceRolled}${bonusStr}${mod}`;
 };

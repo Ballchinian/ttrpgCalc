@@ -50,7 +50,8 @@ const effectSchema = new mongoose.Schema(
         number: { type: diceSchema },
         multiplier: { type: Number },
         damageType: { type: String },
-        persistent: { type: Boolean },
+        //Damage instance category, mirroring Foundry (only "persistent" is currently modelled)
+        category: { type: String, enum: ["persistent", "splash", "precision"] },
         condition: {
             type: String,
             validate: {
@@ -123,10 +124,10 @@ const actionSchema = new mongoose.Schema({
     actionCost: { type: Number, min: 0, max: 3, default: 1 },
     basicSave: { type: Boolean, default: false },
     outcomes: {
-        critSuccess: { type: outcomeSchema, default: () => ({}) },
+        criticalSuccess: { type: outcomeSchema, default: () => ({}) },
         success: { type: outcomeSchema, default: () => ({}) },
         failure: { type: outcomeSchema, default: () => ({}) },
-        critFailure: { type: outcomeSchema, default: () => ({}) }
+        criticalFailure: { type: outcomeSchema, default: () => ({}) }
     }
 }, { timestamps: true });
 

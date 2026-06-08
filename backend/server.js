@@ -24,17 +24,15 @@ const allowedOrigins = [
     "http://localhost:5173",
 ].filter(Boolean);
 
-console.log("Allowed CORS origins:", allowedOrigins);
 
 app.use(cors({
     origin: (origin, callback) => {
-        console.log("CORS check - incoming origin:", JSON.stringify(origin));
-        console.log("CORS check - allowed:", JSON.stringify(allowedOrigins));
         if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
         callback(new Error(`CORS: origin ${origin} not allowed`));
     },
     credentials: true
 }));
+
 //50 KB cap prevents oversized battle payloads
 app.use(express.json({ limit: "50kb" }));
 app.use(cookieParser());

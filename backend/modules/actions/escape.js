@@ -9,7 +9,7 @@ export default {
         reverseOutcome: false,
     },
     outcomes: {
-        critSuccess: {
+        criticalSuccess: {
             text: "You get free and remove the grabbed, immobilized, and restrained conditions imposed by your chosen target. You can then Stride up to 5 feet.",
             effects: [
                 { type: "removeCondition", condition: "grabbed", target: "activeActor" },
@@ -29,7 +29,7 @@ export default {
             text: "You fail to free yourself.",
             effects: []
         },
-        critFailure: {
+        criticalFailure: {
             text: "You don't get free, and you can't attempt to Escape again until your next turn.",
             effects: []
         }

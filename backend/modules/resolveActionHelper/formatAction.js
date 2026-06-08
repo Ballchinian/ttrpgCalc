@@ -3,6 +3,7 @@ import likelihoodTable from "../../utility/likelihoodTable.js";
 import { actionModules } from "../actions/actionModules/actionModules.js";
 import { buildTraitProfile } from "../actions/traitModules/traitModules.js";
 import { avgOfDice } from "../../utility/diceUtils.js";
+import { getStat } from "../../utility/statAccess.js";
 import { MULTIPLIER_TABLE, BASIC_SAVE_MULTIPLIER_TABLE, OUTCOME_KEYS } from "../../data/outcomeDefs.js";
 
 const SAVE_STATS = new Set(["fortitude", "reflex", "will", "perception"]);
@@ -32,16 +33,16 @@ export const formatAction = (diceMode, activeActor, targetCharacters, action) =>
                 : [char, check.targetStat, activeActor, check.actorStat];
             //Backwards compat: records saved before rename still store actorStat as "toHit"
             const effectiveModStat = modStat === "toHit" ? "strHit" : modStat;
-            let dcValue = dcOwner.stats[dcStat] ?? dcOwner.stats.skills?.[dcStat] ?? 0;
-            let modValue = modOwner.stats[effectiveModStat] ?? modOwner.stats.skills?.[effectiveModStat] ?? 0;
+            let dcValue = getStat(dcOwner.stats, dcStat) ?? 0;
+            let modValue = getStat(modOwner.stats, effectiveModStat) ?? 0;
             //Guard against NaN (e.g. character saved with an empty DC field), NaN comparisons always false, making every roll a "success"
             if (!Number.isFinite(dcValue)) dcValue = 0;
             if (!Number.isFinite(modValue)) modValue = 0;
             //Modifier stats (saves, skills) need +10 to convert to DC regardless of roll direction
             if (!FULL_DC_STATS.has(dcStat)) dcValue += MODIFIER_TO_DC_OFFSET;
             //Ranged: always use dexHit; Finesse: use dexHit if it beats strHit
-            if (ranged && effectiveModStat === "strHit") modValue = modOwner.stats.dexHit ?? modValue;
-            else if (finesse && effectiveModStat === "strHit") modValue = Math.max(modValue, modOwner.stats.dexHit ?? 0);
+            if (ranged && effectiveModStat === "strHit") modValue = getStat(modOwner.stats, "dexHit") ?? modValue;
+            else if (finesse && effectiveModStat === "strHit") modValue = Math.max(modValue, getStat(modOwner.stats, "dexHit") ?? 0);
             return {
                 id: char.id,
                 name: char.name,
@@ -57,8 +58,8 @@ export const formatAction = (diceMode, activeActor, targetCharacters, action) =>
             const base = { id, name, actionType: effectiveMod.type, targetDC, rollModifier, activeActorName: activeActor.name, actionName, reverseOutcome, basicSave: effectiveMod.basicSave ?? false };
             //chanceOfOutcome and outcomeEffects are computed for all modes so the log
             //can always render the full outcome breakdown, not just the applied result
-            //Save spells (target's POV): critFailure=double, failure=full, success=half, critSuccess=0
-            //Attacks (actor's POV): critSuccess=double, success=full, failure/critFailure=miss
+            //Save spells (target's POV): criticalFailure=double, failure=full, success=half, criticalSuccess=0
+            //Attacks (actor's POV): criticalSuccess=double, success=full, failure/criticalFailure=miss
             const multiplierTable = reverseOutcome ? BASIC_SAVE_MULTIPLIER_TABLE : MULTIPLIER_TABLE;
             const { totalAvgMultiplier, chanceOfOutcome } = likelihoodTable(targetDC.value, rollModifier.value, multiplierTable, critThreshold);
             const outcomeEffects = effectiveMod.outcomes;
@@ -66,7 +67,7 @@ export const formatAction = (diceMode, activeActor, targetCharacters, action) =>
             if (diceMode === "luck") {
                 const diceResult = Math.floor(Math.random() * D20_FACES) + 1;
                 const outcomeKey = successTable(targetDC.value, rollModifier.value, diceResult, critThreshold);
-                //outcomeKey is roller's POV: for saves that's target's POV (critFailure = target failed badly = max dmg)
+                //outcomeKey is roller's POV: for saves that's target's POV (criticalFailure = target failed badly = max dmg)
                 //For saves: use save multiplier table. For non-save: fall back to stored multiplier or table value.
                 const rawEffects = effectiveMod.outcomes[outcomeKey]?.effects ?? [];
                 const effects = rawEffects.map(e => {
@@ -93,6 +94,8 @@ export const formatAction = (diceMode, activeActor, targetCharacters, action) =>
                 Object.entries(outcomeEffects).forEach(([key, outcomeData]) => {
                     resolvedOutcomes[key] = (outcomeData?.effects ?? []).map(e => {
                         if (e.type !== "damage" && e.type !== "healing") return e;
+                        //Persistent damage has no immediate HP loss — condition creation handles it
+                        if (e.category === "persistent") return { ...e, resolvedValue: 0 };
                         //Use the tier multiplier for saves or when no explicit multiplier is stored
                         const fallback = multiplierTable[key] ?? 1;
                         const mult = (reverseOutcome || e.multiplier == null) ? fallback : e.multiplier;
@@ -132,7 +135,7 @@ export const formatAction = (diceMode, activeActor, targetCharacters, action) =>
     function withStrMod(mod) {
         if (!mod || module.category !== "weapon") return module;
         const patchEffects = effects => effects.map(e =>
-            e.type !== "damage" ? e : { ...e, number: { ...e.number, modifier: (e.number?.modifier ?? 0) + mod } }
+            (e.type !== "damage" || e._critSpec) ? e : { ...e, number: { ...e.number, modifier: (e.number?.modifier ?? 0) + mod } }
         );
         return {
             ...module,
@@ -182,7 +185,7 @@ export const formatAction = (diceMode, activeActor, targetCharacters, action) =>
             const reverseOutcome = check.reverseOutcome !== undefined ? check.reverseOutcome : SAVE_STATS.has(check.targetStat);
             const { mapPenalty, countsAsAttack, critThreshold, finesse, ranged, elementalDamage } = buildTraitProfile(module.traits);
             //Melee weapons add STR mod to damage; ranged get no ability modifier to damage
-            const strMod = (!ranged && module.category === "weapon") ? (activeActor.stats.str ?? 0) : 0;
+            const strMod = (!ranged && module.category === "weapon") ? (getStat(activeActor.stats, "str") ?? 0) : 0;
             const effectiveModule = withElementalDamage(withStrMod(strMod), elementalDamage);
             let targetValueList = buildTargetList(check, reverseOutcome, finesse, ranged);
             let newMapAttacks = null;

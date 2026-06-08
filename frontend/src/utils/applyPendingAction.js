@@ -4,6 +4,7 @@ import { useGameDataStore } from '../store/gameDataStore';
 import { manageOffGuardFrontend } from '../components/utility/manageOffGuard';
 import { buildRecapEntry } from './buildRecapEntry';
 import { isCoveredByHigher, supersededBy } from '../data/conditionHierarchy';
+import { queueCritSpecPrompts } from './critSpecPrompts';
 
 //Stamps actor context onto an endOfNextTurn duration that hasn't been hydrated yet
 function hydrateDuration(duration, recapContext) {
@@ -44,8 +45,8 @@ export function applyPendingAction(applyKey = null, targetId = null) {
                 };
                 merged.effects = hydrateEffects(merged.effects || [], recapContext);
                 //Sync off-guard for conditions added or removed by the backend result
-                const prevNames = new Set((c.effects || []).map(e => e.name));
-                const newNames = new Set(merged.effects.map(e => e.name));
+                const prevNames = new Set((c.effects || []).map(e => e.slug));
+                const newNames = new Set(merged.effects.map(e => e.slug));
                 offGuardActions.forEach(condName => {
                     const was = prevNames.has(condName);
                     const is  = newNames.has(condName);
@@ -160,6 +161,23 @@ export function applyPendingAction(applyKey = null, targetId = null) {
         );
         addEntry(recapContext.round, entry);
         clearPendingAction();
+
+        //Queue crit spec prompts (saves, axe adjacent damage) for targets the user marked criticalSuccess
+        if (pendingAction.critSpecGroup) {
+            const crittedIds = Object.entries(updatedChosenOutcomes)
+                .filter(([, key]) => key === "criticalSuccess")
+                .map(([id]) => id);
+            const { parties } = useBattleStore.getState();
+            const actor = [...parties.heroes, ...parties.foes].find(c => c.id === recapContext.actorId) ?? null;
+            queueCritSpecPrompts({
+                group: pendingAction.critSpecGroup,
+                crittedIds,
+                diceMode: "choose",
+                actor,
+                weaponDice: pendingAction.critSpecWeaponDice,
+                recapContext,
+            });
+        }
     }
 }
 
@@ -179,13 +197,15 @@ function computeTheoreticalHP(char, effects) {
 }
 
 //Applies a list of pre-resolved effects to a character and returns the updated character
-function applyEffectsToChar(char, effects, recapContext, ignoreHP = false) {
+export function applyEffectsToChar(char, effects, recapContext, ignoreHP = false) {
     const { offGuardActions } = useGameDataStore.getState();
     let updated = { ...char, stats: { ...char.stats }, effects: [...(char.effects || [])] };
 
     effects.forEach(effect => {
         if (effect.type === "damage") {
             if (ignoreHP) return;
+            //Persistent damage has no immediate HP loss (backend sets resolvedValue:0; condition handles it)
+            if (effect.category === "persistent" || effect.resolvedValue === 0) return;
             if (effect.resolvedValue !== undefined) {
                 updated = { ...updated, stats: { ...updated.stats, currentHealth: Math.max(0, updated.stats.currentHealth - effect.resolvedValue) } };
             } else {
@@ -209,18 +229,18 @@ function applyEffectsToChar(char, effects, recapContext, ignoreHP = false) {
                 const type = effect.damageType.toLowerCase();
                 if ((updated.immunities ?? []).some(i => i.toLowerCase() === type)) return;
                 const duration = hydrateDuration(effect.duration, recapContext);
-                const existing = updated.effects.find(e => e.name === condName);
+                const existing = updated.effects.find(e => e.slug === condName);
                 if (existing) {
                     //PF2e: same damage type doesn't stack — keep the higher amount
-                    const newNumber = Math.max(existing.number, effect.adjustBy ?? 1);
-                    if (newNumber > existing.number) {
+                    const newValue = Math.max(existing.value, effect.adjustBy ?? 1);
+                    if (newValue > existing.value) {
                         updated.effects = updated.effects.map(e =>
-                            e.name === condName ? { ...e, number: newNumber, duration } : e
+                            e.slug === condName ? { ...e, value: newValue, duration } : e
                         );
                     }
                 } else {
                     updated.effects = [...updated.effects, {
-                        name: condName, number: effect.adjustBy || 1,
+                        slug: condName, value: effect.adjustBy || 1,
                         damageType: type, duration,
                     }];
                 }
@@ -229,18 +249,18 @@ function applyEffectsToChar(char, effects, recapContext, ignoreHP = false) {
             //Skip if a more severe condition already makes this one redundant (e.g. grabbed when restrained is present)
             if (isCoveredByHigher(condName, updated.effects)) return;
             const duration = hydrateDuration(effect.duration, recapContext);
-            const existing = updated.effects.find(e => e.name === condName);
+            const existing = updated.effects.find(e => e.slug === condName);
             if (existing) {
                 //Apply highest level; always refresh duration (PF2e: reapplication refreshes duration)
-                const newNumber = Math.max(existing.number, effect.adjustBy ?? 1);
+                const newValue = Math.max(existing.value, effect.adjustBy ?? 1);
                 updated.effects = updated.effects.map(e =>
-                    e.name === condName ? { ...e, number: newNumber, duration } : e
+                    e.slug === condName ? { ...e, value: newValue, duration } : e
                 );
             } else {
                 //Remove less-severe conditions this one supersedes (e.g. remove grabbed when applying restrained)
                 const toRemove = new Set(supersededBy(condName));
-                if (toRemove.size) updated.effects = updated.effects.filter(e => !toRemove.has(e.name));
-                updated.effects = [...updated.effects, { name: condName, number: effect.adjustBy || 1, duration }];
+                if (toRemove.size) updated.effects = updated.effects.filter(e => !toRemove.has(e.slug));
+                updated.effects = [...updated.effects, { slug: condName, value: effect.adjustBy || 1, duration }];
                 //Sync off-guard sources when conditions that grant off-guard are applied (e.g. prone, grabbed)
                 if (offGuardActions.includes(condName)) {
                     updated = manageOffGuardFrontend(updated, condName, "add");
@@ -249,7 +269,7 @@ function applyEffectsToChar(char, effects, recapContext, ignoreHP = false) {
 
         } else if (effect.type === "removeCondition") {
             const condName = effect.condition.toLowerCase();
-            updated.effects = updated.effects.filter(e => e.name !== condName);
+            updated.effects = updated.effects.filter(e => e.slug !== condName);
             //Sync off-guard sources on removal too
             if (offGuardActions.includes(condName)) {
                 updated = manageOffGuardFrontend(updated, condName, "remove");

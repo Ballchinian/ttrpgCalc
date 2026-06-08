@@ -15,10 +15,10 @@ const initialSpellData = {
         actorStat: "dc"
     },
     outcomes: {
-        critSuccess: [],
+        criticalSuccess: [],
         success: [],
         failure: [],
-        critFailure: []
+        criticalFailure: []
     }
 };
 
@@ -60,7 +60,7 @@ function SpellBuilder() {
         const { name, value, type, checked } = e.target;
         //When basicSave is toggled off, reset outcomes so stale 0.5x/2x multipliers don't persist
         if (name === "basicSave" && !checked) {
-            setSpellData(prev => ({ ...prev, basicSave: false, outcomes: { critSuccess: [], success: [], failure: [], critFailure: [] } }));
+            setSpellData(prev => ({ ...prev, basicSave: false, outcomes: { criticalSuccess: [], success: [], failure: [], criticalFailure: [] } }));
             return;
         }
         setSpellData(prev => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
@@ -113,10 +113,10 @@ function SpellBuilder() {
             targetType: spellData.targetType,
             actionCost: spellData.actionCost,
             outcomes: {
-                critSuccess: { effects: spellData.outcomes.critSuccess },
+                criticalSuccess: { effects: spellData.outcomes.criticalSuccess },
                 success: { effects: spellData.outcomes.success },
                 failure: { effects: spellData.outcomes.failure },
-                critFailure: { effects: spellData.outcomes.critFailure }
+                criticalFailure: { effects: spellData.outcomes.criticalFailure }
             }
         });
     }
@@ -145,10 +145,10 @@ function SpellBuilder() {
                     targetType: spell.targetType ?? "single",
                     actionCost: spell.actionCost ?? 1,
                     outcomes: {
-                        critSuccess: spell.outcomes?.critSuccess?.effects ?? [],
+                        criticalSuccess: spell.outcomes?.criticalSuccess?.effects ?? [],
                         success: spell.outcomes?.success?.effects ?? [],
                         failure: spell.outcomes?.failure?.effects ?? [],
-                        critFailure: spell.outcomes?.critFailure?.effects ?? []
+                        criticalFailure: spell.outcomes?.criticalFailure?.effects ?? []
                     }
                 });
             }}

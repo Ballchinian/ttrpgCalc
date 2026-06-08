@@ -8,7 +8,7 @@ export const CONDITION_COVERS = {
 //True if a more-severe condition already makes `name` redundant
 export const isCoveredByHigher = (name, effects) =>
     Object.entries(CONDITION_COVERS).some(
-        ([superior, covered]) => covered.includes(name) && effects.some(e => e.name === superior)
+        ([superior, covered]) => covered.includes(name) && effects.some(e => e.slug === superior)
     );
 
 //Names of conditions superseded (and removed) when `name` is applied

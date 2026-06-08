@@ -1,6 +1,7 @@
 import { resolveActionHelper } from "../modules/resolveActionHelper/resolveActionHelper.js";
 import { actionModules } from "../modules/actions/actionModules/actionModules.js";
 import Action from "../models/actionModel.js";
+import { getCritSpecEffect } from "../data/critSpecDefs.js";
 
 const BONUS_MAX = 200;
 
@@ -22,7 +23,7 @@ function sanitizeBonuses(raw) {
 
 export const resolveAction = async (req, res) => {
     try {
-        const { activeActor, targetCharacters, action, diceMode, offensiveBonuses, characterDefensiveBonuses } = req.body;
+        const { activeActor, targetCharacters, action, diceMode, offensiveBonuses, characterDefensiveBonuses, critSpecGroup } = req.body;
 
         if (!activeActor || !action || !Array.isArray(targetCharacters)) {
             return res.status(400).json({ message: "Missing required fields: activeActor, action, targetCharacters" });
@@ -46,7 +47,25 @@ export const resolveAction = async (req, res) => {
             //Re-fetch from DB to prevent client-supplied action payloads from reaching the resolver
             const dbAction = await Action.findOne({ _id: actionData._id, playerID: req.userID }).lean();
             if (!dbAction) return res.status(404).json({ message: "Action not found" });
-            resolvedAction = { ...action, actionData: dbAction };
+
+            //If the player has crit spec enabled for this weapon group, inject the effect into criticalSuccess
+            const critSpecEffect = critSpecGroup && typeof critSpecGroup === "string"
+                ? getCritSpecEffect(critSpecGroup, dbAction)
+                : null;
+            const actionDataWithCritSpec = critSpecEffect
+                ? {
+                    ...dbAction,
+                    outcomes: {
+                        ...dbAction.outcomes,
+                        criticalSuccess: {
+                            ...dbAction.outcomes?.criticalSuccess,
+                            effects: [...(dbAction.outcomes?.criticalSuccess?.effects ?? []), critSpecEffect],
+                        },
+                    },
+                }
+                : dbAction;
+
+            resolvedAction = { ...action, actionData: actionDataWithCritSpec };
         } else {
             return res.status(400).json({ message: "Unknown action type" });
         }

@@ -6,18 +6,18 @@ import { SPELL_TRADITIONS } from "../../../data/spellTraditions";
 
 //Static tier lists defined at module level to avoid re-creation on every render
 const AC_TIERS = [
-    { identity: "critSuccess", label: "Crit Success" },
+    { identity: "criticalSuccess", label: "Crit Success" },
     { identity: "success", label: "Success" },
     { identity: "failure", label: "Failure" },
-    { identity: "critFailure", label: "Crit Failure" },
+    { identity: "criticalFailure", label: "Crit Failure" },
 ];
 
-//Save rolls use target's POV: critFailure = failed badly (max damage), critSuccess = resisted (no damage)
+//Save rolls use target's POV: criticalFailure = failed badly (max damage), criticalSuccess = resisted (no damage)
 const SAVE_TIERS = [
-    { identity: "critFailure", label: "Crit Failure" },
+    { identity: "criticalFailure", label: "Crit Failure" },
     { identity: "failure", label: "Failure" },
     { identity: "success", label: "Success" },
-    { identity: "critSuccess", label: "Crit Success" },
+    { identity: "criticalSuccess", label: "Crit Success" },
 ];
 
 function SpellForm({ spellData, handleSpellChange, handleTraditionToggle, handleSaveTypeChange, handleActionClick, setEffectsByTier, errors }) {
@@ -29,10 +29,10 @@ function SpellForm({ spellData, handleSpellChange, handleTraditionToggle, handle
     function handleBasicDamageConfirm(damageData) {
         //Target's POV: crit failure = target failed badly = double, crit success = target resisted = no damage
         setEffectsByTier({
-            critFailure: [{ ...damageData, multiplier: 2 }],
+            criticalFailure: [{ ...damageData, multiplier: 2 }],
             failure: [{ ...damageData, multiplier: 1 }],
             success: [{ ...damageData, multiplier: 0.5 }],
-            critSuccess: [],
+            criticalSuccess: [],
         });
         setOpen(false);
     }

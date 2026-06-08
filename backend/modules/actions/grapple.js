@@ -9,7 +9,7 @@ export default {
         reverseOutcome: false,
     },
     outcomes: {
-        critSuccess: {
+        criticalSuccess: {
             text: "Your target is restrained until the end of your next turn unless you move or your target Escapes.",
             effects: [
                 { type: "addCondition", condition: "restrained", duration: { type: "manual" }, target: "targetCharacters" }
@@ -28,7 +28,7 @@ export default {
                 { type: "removeCondition", condition: "restrained", target: "targetCharacters" }
             ]
         },
-        critFailure: {
+        criticalFailure: {
             text: "Your target breaks free. You fall prone.",
             effects: [
                 { type: "removeCondition", condition: "grabbed", target: "targetCharacters" },

@@ -5,6 +5,7 @@ import CharacterSection from "./componentsForSimulator/CharacterSection";
 import CharacterGrid from "./componentsForSimulator/CharacterGrid";
 import ExpiringConditionsNotification from "./componentsForSimulator/ExpiringConditionsNotification";
 import PersistentCheckNotification from "./componentsForSimulator/PersistentCheckNotification";
+import NichePromptPanel from "./componentsForSimulator/NichePromptPanel";
 
 const rightPanelStyle = { paddingTop: "40px" };
 
@@ -17,6 +18,7 @@ function BattleSimulator() {
         <div className="d-flex flex-row w-100 p-4">
             <ExpiringConditionsNotification />
             <PersistentCheckNotification />
+            <NichePromptPanel />
 
             {/* Sticky left panel: round control, action selection, combat log */}
             <LeftPanel />

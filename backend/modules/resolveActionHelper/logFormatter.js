@@ -12,7 +12,7 @@ const effectsParts = (effects, diceMode, isAttack = true) => {
                 //Use _rawDamage (resistance/weakness-adjusted) when available, fall back to raw avg
                 const val = e._rawDamage ?? Math.round(avgOfDice(e.number, e.avgMultiplier ?? 1));
                 if (e.damageType) {
-                    return { type: "typedDamage", text: `~${val} (${e.damageType}) dmg`, value: `~${val}`, damageType: e.damageType, suffix: " dmg", modifiers: e._damageModifiers ?? [] };
+                    return { type: "typedDamage", text: `~${val} (${e.damageType}) dmg`, value: `~${val}`, damageType: e.damageType, persistent: e.category === "persistent", suffix: " dmg", modifiers: e._damageModifiers ?? [] };
                 }
                 return { type: "text", text: `~${val} dmg` };
             }
@@ -28,12 +28,12 @@ const effectsParts = (effects, diceMode, isAttack = true) => {
                 const mulStr = mul !== 1 ? ` ×${mul}` : "";
                 const tooltip = `${rollStr}${bonusStr}${modStr}${mulStr} = ${total}`;
                 if (e.damageType) {
-                    return { type: "typedDamage", text: `${diceFormat(e.number)}${mult} (${e.damageType}) dmg`, value: `${diceFormat(e.number)}${mult}`, damageType: e.damageType, suffix: " dmg", modifiers: e._damageModifiers ?? [], tooltip };
+                    return { type: "typedDamage", text: `${diceFormat(e.number)}${mult} (${e.damageType}) dmg`, value: `${diceFormat(e.number)}${mult}`, damageType: e.damageType, persistent: e.category === "persistent", suffix: " dmg", modifiers: e._damageModifiers ?? [], tooltip };
                 }
                 return { type: "damage", text: `${diceFormat(e.number)}${mult} dmg`, tooltip };
             }
             if (e.damageType) {
-                return { type: "typedDamage", text: `${diceFormat(e.number)}${mult} (${e.damageType}) dmg`, value: `${diceFormat(e.number)}${mult}`, damageType: e.damageType, suffix: " dmg", modifiers: e._damageModifiers ?? [] };
+                return { type: "typedDamage", text: `${diceFormat(e.number)}${mult} (${e.damageType}) dmg`, value: `${diceFormat(e.number)}${mult}`, damageType: e.damageType, persistent: e.category === "persistent", suffix: " dmg", modifiers: e._damageModifiers ?? [] };
             }
             return { type: "text", text: `${diceFormat(e.number)}${mult} dmg` };
         }
@@ -139,7 +139,7 @@ const outcomeEffectParts = (effects) => {
         if (e.type === "damage") {
             const val = e._rawDamage ?? avgOfDice(e.number, e.multiplier ?? 1);
             if (e.damageType) {
-                return { type: "typedDamage", text: `~${Math.round(val)} (${e.damageType}) dmg`, value: `~${Math.round(val)}`, damageType: e.damageType, suffix: " dmg", modifiers: e._damageModifiers ?? [] };
+                return { type: "typedDamage", text: `~${Math.round(val)} (${e.damageType}) dmg`, value: `~${Math.round(val)}`, damageType: e.damageType, persistent: e.category === "persistent", suffix: " dmg", modifiers: e._damageModifiers ?? [] };
             }
             return { type: "text", text: `~${Math.round(val)} dmg` };
         }
@@ -175,7 +175,7 @@ export const logFormatter = (actionInfo, diceMode) => {
 
             //Always build the full outcomes breakdown so the log can show all possibilities regardless of mode
             const c = entry.chanceOfOutcome ?? {};
-            //Saves: show highest damage first (critFailure=max → critSuccess=none); attacks: critSuccess first
+            //Saves: show highest damage first (criticalFailure=max → criticalSuccess=none); attacks: criticalSuccess first
             const orderedKeys = isSave ? [...OUTCOME_KEYS].reverse() : OUTCOME_KEYS;
             //Keys are already roller's POV so labels need no flip; applyKey is used to look up resolvedOutcomes
             const outcomes = orderedKeys.map(key => ({

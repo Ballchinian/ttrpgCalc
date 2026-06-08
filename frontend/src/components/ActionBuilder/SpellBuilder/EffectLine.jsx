@@ -10,7 +10,7 @@ function EffectLine({ effect }) {
                     {effect.number.modifier > 0 && `+${effect.number.modifier}`}
                     {effect.number.modifier < 0 && `${effect.number.modifier}`}{" "}
                     ({effect.damageType ?? "unknown"})
-                    {effect.persistent===true && " (Persistent)"}
+                    {effect.category === "persistent" && " (Persistent)"}
                     {effect.multiplier != null && effect.multiplier !== 1 && ` *${effect.multiplier}`}
                 </span>
             );

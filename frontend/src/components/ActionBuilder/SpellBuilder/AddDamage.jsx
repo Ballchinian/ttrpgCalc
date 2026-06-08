@@ -22,7 +22,8 @@ function AddDamage({ onConfirm, onCancel }) {
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) return;
 
-        onConfirm({ type: "damage", number: damageNumber, damageType, persistent, multiplier: 1 });
+        //category mirrors Foundry's damage-instance categories; only "persistent" is modelled for now
+        onConfirm({ type: "damage", number: damageNumber, damageType, multiplier: 1, ...(persistent && { category: "persistent" }) });
     };
 
     return (

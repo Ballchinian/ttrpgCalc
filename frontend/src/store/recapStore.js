@@ -19,8 +19,21 @@ export const useRecapStore = create(
                 return { recapHistory: updated };
             }),
 
+            //Attach a crit spec result to the most recent entry of a round. Crit spec prompts resolve
+            //right after their action (the "Turn Commence" button is disabled until they're cleared),
+            //so the last entry of that round is always the action that triggered them.
+            appendCritSpec: (round, impact) => set(state => {
+                const entries = state.recapHistory[round];
+                if (!entries?.length) return state;
+                const lastIdx = entries.length - 1;
+                const last = entries[lastIdx];
+                const updatedEntry = { ...last, critSpecImpacts: [...(last.critSpecImpacts ?? []), impact] };
+                const updatedEntries = entries.map((e, i) => i === lastIdx ? updatedEntry : e);
+                return { recapHistory: { ...state.recapHistory, [round]: updatedEntries } };
+            }),
+
             clearRecap: () => set({ recapHistory: {} }),
         }),
-        { name: 'battleRecap' }
+        { name: 'battleRecap_v2' } //_v2: stored recap shape changed (see battleData_v2)
     )
 );

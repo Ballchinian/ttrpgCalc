@@ -31,6 +31,15 @@ const removeButtonStyle = {
     borderRadius: "4px",
     cursor: "pointer",
 };
+const removeButtonBlockedStyle = {
+    padding: "2px 10px",
+    fontSize: "12px",
+    backgroundColor: "rgba(120,120,120,0.4)",
+    color: "rgba(255,255,255,0.35)",
+    border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: "4px",
+    cursor: "not-allowed",
+};
 const keepButtonStyle = {
     padding: "2px 10px",
     fontSize: "12px",
@@ -44,15 +53,17 @@ const headerTitleStyle = { color: "rgba(255,200,50,0.9)", fontWeight: "600", fon
 const headerSubStyle = { color: "rgba(255,255,255,0.4)", fontSize: "12px", marginBottom: "10px" };
 const entryNameStyle = { color: "white", fontSize: "13px" };
 const entryEffectStyle = { color: "rgba(255,255,255,0.55)", fontSize: "13px" };
+const blockedHintStyle = { fontSize: "11px", color: "rgba(255,200,50,0.55)", marginTop: "2px", textAlign: "right" };
 
 function ExpiringConditionsNotification() {
     const expiringConditions = useBattleStore(state => state.expiringConditions);
     const dismissExpiringCondition = useBattleStore(state => state.dismissExpiringCondition);
+    const parties = useBattleStore(state => state.parties);
 
     if (!expiringConditions?.length) return null;
 
-    //All entries share the same triggering actor — use the first for the header
     const actorName = expiringConditions[0]?.actorName ?? "This actor";
+    const allChars = [...(parties?.heroes ?? []), ...(parties?.foes ?? [])];
 
     return (
         <div style={containerStyle}>
@@ -63,32 +74,50 @@ function ExpiringConditionsNotification() {
                 The following conditions were set to expire at the end of {actorName}'s next turn.
             </div>
 
-            {expiringConditions.map((entry) => (
-                <div key={`${entry.charId}-${entry.effectName}`} style={rowStyle}>
-                    <div>
-                        <span style={entryNameStyle}>
-                            {entry.charName}
-                        </span>
-                        <span style={entryEffectStyle}>
-                            {": "}{entry.effectName}{entry.effectNumber > 1 ? ` (${entry.effectNumber})` : ""}
-                        </span>
+            {expiringConditions.map((entry) => {
+                //Off-guard can only be removed if no other conditions are granting it (e.g. prone, grabbed)
+                let blockingSources = [];
+                if (entry.effectName === "off-guard") {
+                    const char = allChars.find(c => c.id === entry.charId);
+                    blockingSources = (char?.offGuardSources ?? []).filter(src => src !== "off-guard");
+                }
+                const isBlocked = blockingSources.length > 0;
+
+                return (
+                    <div key={`${entry.charId}-${entry.effectName}`} style={rowStyle}>
+                        <div>
+                            <span style={entryNameStyle}>
+                                {entry.charName}
+                            </span>
+                            <span style={entryEffectStyle}>
+                                {": "}{entry.effectName}{entry.effectNumber > 1 ? ` (${entry.effectNumber})` : ""}
+                            </span>
+                        </div>
+                        <div>
+                            <div style={btnGroupStyle}>
+                                <button
+                                    onClick={isBlocked ? undefined : () => dismissExpiringCondition(entry.charId, entry.effectName, "remove")}
+                                    disabled={isBlocked}
+                                    style={isBlocked ? removeButtonBlockedStyle : removeButtonStyle}
+                                >
+                                    Remove
+                                </button>
+                                <button
+                                    onClick={() => dismissExpiringCondition(entry.charId, entry.effectName, "keep")}
+                                    style={keepButtonStyle}
+                                >
+                                    Keep
+                                </button>
+                            </div>
+                            {isBlocked && (
+                                <div style={blockedHintStyle}>
+                                    Remove {blockingSources.join(", ")} first
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <div style={btnGroupStyle}>
-                        <button
-                            onClick={() => dismissExpiringCondition(entry.charId, entry.effectName, "remove")}
-                            style={removeButtonStyle}
-                        >
-                            Remove
-                        </button>
-                        <button
-                            onClick={() => dismissExpiringCondition(entry.charId, entry.effectName, "keep")}
-                            style={keepButtonStyle}
-                        >
-                            Keep
-                        </button>
-                    </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 }

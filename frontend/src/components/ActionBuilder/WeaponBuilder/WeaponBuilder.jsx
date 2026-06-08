@@ -80,10 +80,10 @@ function WeaponBuilder() {
             actionCost: weaponData.actionCost,
             check: { targetStat: "ac", actorStat },
             outcomes: {
-                critSuccess: { effects: [{ type: "damage", damageType: weaponData.damage.damageType, number: numberObj, multiplier: 2 }] },
+                criticalSuccess: { effects: [{ type: "damage", damageType: weaponData.damage.damageType, number: numberObj, multiplier: 2 }] },
                 success: { effects: [{ type: "damage", damageType: weaponData.damage.damageType, number: numberObj }] },
                 failure: { effects: [] },
-                critFailure: { effects: [] }
+                criticalFailure: { effects: [] }
             }
         });
     }

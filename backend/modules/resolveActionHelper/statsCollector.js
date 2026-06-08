@@ -31,8 +31,8 @@ function conditionSourcesWithLevel(breakdown, characterEffects) {
         breakdown
             .filter(b => CONDITION_NAMES.has(b.source.toLowerCase()))
             .map(b => {
-                const eff = characterEffects.find(e => e.name === b.source.toLowerCase());
-                return eff?.number > 1 ? `${b.source} ${eff.number}` : b.source;
+                const eff = characterEffects.find(e => e.slug === b.source.toLowerCase());
+                return eff?.value > 1 ? `${b.source} ${eff.value}` : b.source;
             })
     )];
 }
@@ -61,9 +61,9 @@ function getDamageEffects(entry, diceMode) {
     return (entry.outcomeEffects?.success?.effects ?? []).filter(e => e.type === "damage");
 }
 
-//Rate at which the actor's action "hits" (attacks: success+critSuccess; saves: target's failure+critFailure)
+//Rate at which the actor's action "hits" (attacks: success+criticalSuccess; saves: target's failure+criticalFailure)
 function successRateMultiplier(actualNorm, baselineNorm, isSave = false) {
-    const hitKeys = isSave ? ["failure", "critFailure"] : ["success", "critSuccess"];
+    const hitKeys = isSave ? ["failure", "criticalFailure"] : ["success", "criticalSuccess"];
     const actualRate = hitKeys.reduce((s, k) => s + (actualNorm[k] ?? 0), 0);
     const baseRate = hitKeys.reduce((s, k) => s + (baselineNorm[k] ?? 0), 0);
     return baseRate > MIN_RATE_DIVISOR ? Math.round((actualRate / baseRate) * 100) / 100 : null;
@@ -107,7 +107,7 @@ function analyzeConditionImpact(entry, isSave, dcBreakdown, modBreakdown, diceMo
         targetArrow: targetContrib <= 0 ? "↑" : "↓",
     };
 
-    //Saves use target's POV table (critFailure=2x); attacks use actor's POV table (critSuccess=2x)
+    //Saves use target's POV table (criticalFailure=2x); attacks use actor's POV table (criticalSuccess=2x)
     const multTable = isSave ? BASIC_SAVE_MULTIPLIER_TABLE : MULTIPLIER_TABLE;
 
     if (diceMode === "luck" && entry.diceResult !== undefined && entry.outcomeKey) {
@@ -211,7 +211,7 @@ function analyzeOffGuardImpact(entry, isSave, dcBreakdown, diceMode, activeActor
     //Off-guard only affects AC, spell saves (reverseOutcome) use Will/Fort/Reflex, skip entirely
     if (isSave) return { offGuardBenefit: 0, impact: null };
     //Target already has off-guard (or prone/any offGuard:true effect) — hypothesis is moot
-    if (targetChar?.effects?.some(e => effectModules[e.name]?.offGuard === true)) {
+    if (targetChar?.effects?.some(e => effectModules[e.slug]?.offGuard === true)) {
         return { offGuardBenefit: 0, impact: null };
     }
     //Clamp by any existing circumstance penalty already on AC to avoid double-counting

@@ -66,8 +66,8 @@ export function useCharacterCardActions(character) {
             updateCharacterInList(character.side, character.id, c => ({
                 ...c,
                 effects: [
-                    ...(c.effects || []).filter(e => e.name !== fullName),
-                    { name: fullName, number: damageAmount, damageType: damageType.toLowerCase().trim(), duration },
+                    ...(c.effects || []).filter(e => e.slug !== fullName),
+                    { slug: fullName, value: damageAmount, damageType: damageType.toLowerCase().trim(), duration },
                 ],
             }));
             setPendingEffect(null);
@@ -76,11 +76,11 @@ export function useCharacterCardActions(character) {
         }
 
         const nameLower = name.toLowerCase();
-        if (!character.effects?.some(e => e.name === nameLower) && !isCoveredByHigher(nameLower, character.effects || [])) {
+        if (!character.effects?.some(e => e.slug === nameLower) && !isCoveredByHigher(nameLower, character.effects || [])) {
             const toRemove = new Set(supersededBy(nameLower));
             updateCharacterInList(character.side, character.id, c => {
-                const filtered = toRemove.size ? (c.effects || []).filter(e => !toRemove.has(e.name)) : (c.effects || []);
-                const next = { ...c, effects: [...filtered, { name: nameLower, number: 1, description: getEffectInfo(name)?.description, duration }] };
+                const filtered = toRemove.size ? (c.effects || []).filter(e => !toRemove.has(e.slug)) : (c.effects || []);
+                const next = { ...c, effects: [...filtered, { slug: nameLower, value: 1, description: getEffectInfo(name)?.description, duration }] };
                 return syncOffGuard(next, nameLower, "add");
             });
         }
@@ -89,12 +89,12 @@ export function useCharacterCardActions(character) {
     };
 
     const handleChangedEffect = (effect) => {
-        const name = effect.name.toLowerCase();
+        const name = effect.slug.toLowerCase();
         if (name === OFF_GUARD) { setError("Off-Guard is managed automatically and cannot be edited directly."); return; }
         if (name.startsWith("persistent ")) {
             setStackEdit({
                 effect,
-                inputValue: String(effect.number),
+                inputValue: String(effect.value),
                 durationType: effect.duration?.type ?? "manual",
                 remaining: effect.duration?.remaining ?? 1,
                 isPersistent: true,
@@ -104,7 +104,7 @@ export function useCharacterCardActions(character) {
         }
         setStackEdit({
             effect,
-            inputValue: String(effect.number),
+            inputValue: String(effect.value),
             durationType: effect.duration?.type ?? "manual",
             remaining: effect.duration?.remaining ?? 1,
         });
@@ -115,7 +115,7 @@ export function useCharacterCardActions(character) {
         const { effect, inputValue, durationType, remaining, isPersistent, damageType } = stackEdit;
         const parsed = Number(inputValue);
         if (!Number.isInteger(parsed) || parsed < 0 || parsed > MAX_STACK) return;
-        const name = effect.name.toLowerCase();
+        const name = effect.slug.toLowerCase();
         const needsActor = durationType === "endOfNextTurn" || durationType === "currentTurn";
         if (needsActor && !target.activeActor) {
             setError("Select an active actor before using this duration type.");
@@ -131,10 +131,10 @@ export function useCharacterCardActions(character) {
             const newType = (damageType ?? "").toLowerCase().trim();
             const newName = newType ? `persistent ${newType}` : name;
             updateCharacterInList(character.side, character.id, c => {
-                if (parsed === 0) return { ...c, effects: (c.effects || []).filter(e => e.name !== name) };
+                if (parsed === 0) return { ...c, effects: (c.effects || []).filter(e => e.slug !== name) };
                 //Remove old entry and any collision with the new name, then insert updated
-                const filtered = (c.effects || []).filter(e => e.name !== name && e.name !== newName);
-                return { ...c, effects: [...filtered, { name: newName, number: parsed, damageType: newType, duration }] };
+                const filtered = (c.effects || []).filter(e => e.slug !== name && e.slug !== newName);
+                return { ...c, effects: [...filtered, { slug: newName, value: parsed, damageType: newType, duration }] };
             });
             setStackEdit(null);
             return;
@@ -142,13 +142,13 @@ export function useCharacterCardActions(character) {
 
         updateCharacterInList(character.side, character.id, c => {
             if (parsed === 0) {
-                const next = { ...c, effects: (c.effects || []).filter(e => e.name !== name) };
+                const next = { ...c, effects: (c.effects || []).filter(e => e.slug !== name) };
                 return syncOffGuard(next, name, "remove");
             }
             //When upgrading level: also remove conditions now covered by this one
             const toRemove = new Set(supersededBy(name));
-            const baseEffects = toRemove.size ? (c.effects || []).filter(e => !toRemove.has(e.name)) : (c.effects || []);
-            const next = { ...c, effects: baseEffects.map(e => e.name === name ? { ...e, number: parsed, duration } : e) };
+            const baseEffects = toRemove.size ? (c.effects || []).filter(e => !toRemove.has(e.slug)) : (c.effects || []);
+            const next = { ...c, effects: baseEffects.map(e => e.slug === name ? { ...e, value: parsed, duration } : e) };
             return next;
         });
         setStackEdit(null);
@@ -163,7 +163,7 @@ export function useCharacterCardActions(character) {
 
     const handleOffGuardToggle = (e) => {
         e.stopPropagation();
-        const isOffGuard = (character.effects || []).some(ef => ef.name === OFF_GUARD);
+        const isOffGuard = (character.effects || []).some(ef => ef.slug === OFF_GUARD);
         updateCharacterInList(character.side, character.id, c => {
             const copy = { ...c, effects: [...(c.effects || [])], offGuardSources: [...(c.offGuardSources || [])] };
             return manageOffGuardFrontend(copy, "manual", isOffGuard ? "remove" : "add");
@@ -189,7 +189,7 @@ export function useCharacterCardActions(character) {
         //Derived
         isActiveActor: target.activeActor?.id === character.id,
         isTargetCharacters: target.selectedTargetCharacters?.some(t => t.id === character.id) ?? false,
-        isOffGuard: (character.effects || []).some(e => e.name === OFF_GUARD),
+        isOffGuard: (character.effects || []).some(e => e.slug === OFF_GUARD),
         hasActiveActor: !!target.activeActor,
         filteredEffects,
         //Store actions exposed for JSX use

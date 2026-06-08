@@ -6,7 +6,7 @@ import { OFF_GUARD } from '../data/effectNames';
 const defaultState = {
     parties: { heroes: [], foes: [] },
     target: { mode: null, activeActor: null, selectedTargetCharacters: [] },
-    action: { selected: "", selectedType: "", targetType: "", choosing: false },
+    action: { selected: "", selectedType: "", targetType: "", choosing: false, critSpec: false },
     settings: {
         diceMode: "avg",
         autoActions: true,
@@ -19,6 +19,7 @@ const defaultState = {
     log: {},
     error: "",
     pendingAction: null,
+    pendingNichePrompts: [],
     expiringConditions: [],
     persistCheckResults: [],
 };
@@ -89,11 +90,11 @@ export const useBattleStore = create(
                     //Apply persistent damage first, then handle flat checks and effect cleanup
                     let workChar = char;
                     if (state.settings.autoDecrementConditions) {
-                        const persistEffects = (char.effects || []).filter(e => e.name.startsWith("persistent ") && e.number > 0);
+                        const persistEffects = (char.effects || []).filter(e => e.slug.startsWith("persistent ") && e.value > 0);
                         if (persistEffects.length > 0) {
                             const persistTotal = persistEffects.reduce((sum, e) => {
-                                const type = e.damageType ?? e.name.replace("persistent ", "");
-                                return sum + applyMods(e.number, type, char);
+                                const type = e.damageType ?? e.slug.replace("persistent ", "");
+                                return sum + applyMods(e.value, type, char);
                             }, 0);
                             if (persistTotal > 0) {
                                 workChar = { ...char, stats: { ...char.stats, currentHealth: Math.max(0, (char.stats?.currentHealth ?? 0) - persistTotal) } };
@@ -108,16 +109,16 @@ export const useBattleStore = create(
                                     const recovered = roll >= 15;
                                     allFlatCheckResults.push({
                                         charName: char.name,
-                                        effectName: e.name,
-                                        amount: e.number,
-                                        damageType: e.damageType ?? e.name.replace("persistent ", ""),
+                                        effectName: e.slug,
+                                        amount: e.value,
+                                        damageType: e.damageType ?? e.slug.replace("persistent ", ""),
                                         roll,
                                         recovered,
                                     });
-                                    if (recovered) toRemove.add(e.name);
+                                    if (recovered) toRemove.add(e.slug);
                                 });
                             if (toRemove.size > 0) {
-                                workChar = { ...workChar, effects: (workChar.effects || []).filter(ef => !toRemove.has(ef.name)) };
+                                workChar = { ...workChar, effects: (workChar.effects || []).filter(ef => !toRemove.has(ef.slug)) };
                             }
                         }
                     }
@@ -125,14 +126,14 @@ export const useBattleStore = create(
                     const filteredEffects = state.settings.autoDecrementConditions
                         ? workChar.effects
                             .map(e => {
-                                if (e.duration?.type === "decrement") return { ...e, number: e.number - 1 };
+                                if (e.duration?.type === "decrement") return { ...e, value: e.value - 1 };
                                 if (e.duration?.type === "rounds") return { ...e, duration: { ...e.duration, remaining: (e.duration.remaining ?? 1) - 1 } };
                                 return e;
                             })
                             .filter(e => {
                                 if (e.duration?.type === "endOfRound")    return false;
                                 if (e.duration?.type === "currentTurn")   return false; //also clears at round end
-                                if (e.duration?.type === "decrement")     return e.number > 0;
+                                if (e.duration?.type === "decrement")     return e.value > 0;
                                 if (e.duration?.type === "rounds")        return (e.duration.remaining ?? 0) > 0;
                                 if (e.duration?.type === "endOfNextTurn") return true;
                                 if (e.duration?.type === "manual")        return true;
@@ -142,17 +143,37 @@ export const useBattleStore = create(
                         : workChar.effects;
 
                     //Sync offGuardSources: remove any source whose condition was dropped by the filter
-                    const keptNames = new Set(filteredEffects.map(e => e.name));
+                    const keptNames = new Set(filteredEffects.map(e => e.slug));
                     const newSources = (workChar.offGuardSources || []).filter(src => keptNames.has(src));
                     const finalEffects = newSources.length === 0
-                        ? filteredEffects.filter(e => e.name !== OFF_GUARD)
+                        ? filteredEffects.filter(e => e.slug !== OFF_GUARD)
                         : filteredEffects;
+
+                    //Start-of-turn action loss from stunned/slowed. PF2e: the two don't stack —
+                    //lose the higher value, then stunned reduces by the actions lost while slowed persists.
+                    let actionsRemaining = [true, true, true];
+                    let updatedFinalEffects = finalEffects;
+                    const stunnedVal = finalEffects.find(e => e.slug === "stunned")?.value ?? 0;
+                    const slowedVal = finalEffects.find(e => e.slug === "slowed")?.value ?? 0;
+                    const actionsLost = Math.min(Math.max(stunnedVal, slowedVal), 3);
+                    if (actionsLost > 0) {
+                        for (let i = 0; i < actionsLost; i++) {
+                            const idx = actionsRemaining.lastIndexOf(true);
+                            if (idx !== -1) actionsRemaining[idx] = false;
+                        }
+                        if (stunnedVal > 0) {
+                            const newStunned = stunnedVal - actionsLost;
+                            updatedFinalEffects = newStunned <= 0
+                                ? finalEffects.filter(e => e.slug !== "stunned")
+                                : finalEffects.map(e => e.slug === "stunned" ? { ...e, value: newStunned } : e);
+                        }
+                    }
 
                     return {
                         ...workChar,
-                        actionsRemaining: [true, true, true],
+                        actionsRemaining,
                         mapAttacks: 0,
-                        effects: finalEffects,
+                        effects: updatedFinalEffects,
                         offGuardSources: newSources,
                     };
                 };
@@ -184,7 +205,7 @@ export const useBattleStore = create(
             toggleTargetActiveActor: () => set(state => ({
                 //MAP is NOT reset here, it persists across re-selections of the same actor
                 //within a round, only resetting when a DIFFERENT actor takes a turn or at endRound
-                action: { selected: "", selectedType: "", targetType: "", choosing: false },
+                action: { selected: "", selectedType: "", targetType: "", choosing: false, critSpec: false },
                 target: {
                     mode: state.target.mode === "activeActor" ? null : "activeActor",
                     activeActor: null,
@@ -244,7 +265,7 @@ export const useBattleStore = create(
                                     if (effect.duration?.type === "endOfNextTurn" &&
                                         effect.duration.actorId === newActorId &&
                                         effect.duration.appliedRound < state.round) {
-                                        expiringConditions.push({ charId: char.id, charName: char.name, charSide: char.side, effectName: effect.name, effectNumber: effect.number, actorName: effect.duration.actorName });
+                                        expiringConditions.push({ charId: char.id, charName: char.name, charSide: char.side, effectName: effect.slug, effectNumber: effect.value, actorName: effect.duration.actorName });
                                     }
                                 });
                             });
@@ -282,7 +303,7 @@ export const useBattleStore = create(
                     targetType === "self" ||
                     (prevTargetType === "aoe" && targetType === "single");
                 return {
-                    action: { ...state.action, selected, selectedType, targetType },
+                    action: { ...state.action, selected, selectedType, targetType, critSpec: false },
                     target: {
                         ...state.target,
                         mode: null,
@@ -292,6 +313,7 @@ export const useBattleStore = create(
             }),
 
             setChoosingAction: (choosing) => set(state => ({ action: { ...state.action, choosing } })),
+            setCritSpec: (critSpec) => set(state => ({ action: { ...state.action, critSpec } })),
 
             //Log & error
 
@@ -299,6 +321,8 @@ export const useBattleStore = create(
             setError: (error) => set({ error }),
             setPendingAction: (data) => set({ pendingAction: data }),
             clearPendingAction: () => set({ pendingAction: null }),
+            addNichePrompt: (prompt) => set(state => ({ pendingNichePrompts: [...state.pendingNichePrompts, prompt] })),
+            resolveNichePrompt: () => set(state => ({ pendingNichePrompts: state.pendingNichePrompts.slice(1) })),
 
             //Remove one entry from the expiring notification; if action is "remove" also strips the condition from the character
             dismissExpiringCondition: (charId, effectName, action) => set(state => {
@@ -308,9 +332,19 @@ export const useBattleStore = create(
                 if (!entry) return { expiringConditions: remaining };
                 const key = entry.charSide === "hero" ? "heroes" : "foes";
                 if (!state.parties[key].some(c => c.id === charId)) return { expiringConditions: remaining };
-                const updatedList = state.parties[key].map(c =>
-                    c.id === charId ? { ...c, effects: (c.effects || []).filter(e => e.name !== effectName) } : c
-                );
+                const updatedList = state.parties[key].map(c => {
+                    if (c.id !== charId) return c;
+                    //Drop the dismissed condition and remove it as an off-guard source
+                    const newSources = (c.offGuardSources || []).filter(src => src !== effectName);
+                    const existingOffGuard = (c.effects || []).find(e => e.slug === OFF_GUARD);
+                    let newEffects = (c.effects || []).filter(e => e.slug !== effectName && e.slug !== OFF_GUARD);
+                    //Off-guard persists as long as another condition still grants it (e.g. prone, grabbed);
+                    //only strip it once no sources remain. This keeps the rule in the store, not the UI.
+                    if (newSources.length > 0) {
+                        newEffects = [...newEffects, existingOffGuard ?? { slug: OFF_GUARD, value: 1, duration: { type: "manual" } }];
+                    }
+                    return { ...c, effects: newEffects, offGuardSources: newSources };
+                });
                 const syncedTargets = state.target.selectedTargetCharacters.map(t =>
                     t.id === charId && t.side === entry.charSide ? (updatedList.find(c => c.id === charId) || t) : t
                 );
@@ -382,7 +416,7 @@ export const useBattleStore = create(
                         ...char,
                         stats: {
                             ...fresh.stats,
-                            maxHealth: fresh.stats.health,
+                            maxHealth: fresh.stats.attributes?.hp ?? char.stats.maxHealth ?? 0,
                             currentHealth: char.stats.currentHealth,
                         },
                         resistances: fresh.resistances ?? [],
@@ -405,17 +439,20 @@ export const useBattleStore = create(
             resetBattle: () => set({
                 parties: { heroes: [], foes: [] },
                 target: { mode: null, activeActor: null, selectedTargetCharacters: [] },
-                action: { selected: "", selectedType: "", targetType: "", choosing: false },
+                action: { selected: "", selectedType: "", targetType: "", choosing: false, critSpec: false },
                 round: 1,
                 log: {},
                 error: "",
                 pendingAction: null,
+                pendingNichePrompts: [],
                 expiringConditions: [],
                 persistCheckResults: [],
             }),
         }),
         {
-            name: 'battleData',
+            //_v2: bumped when the stored shape changed (Foundry-aligned outcome keys, damage
+            //category, slug/value conditions, namespaced stats) — discards incompatible old state
+            name: 'battleData_v2',
             //Only persist the state shape, not the action functions
             partialize: (state) => ({
                 parties: state.parties,

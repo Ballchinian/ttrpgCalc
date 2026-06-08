@@ -11,9 +11,10 @@ const cardStyle = {
     border: "1px solid rgba(255,255,255,0.1)",
 };
 //Sub-component static styles
-const popoverBodyStyle = { backgroundColor: "#1e1e2e", color: "white", fontSize: "12px", maxWidth: "260px" };
+const popoverBodyStyle = { backgroundColor: "#1e1e2e", color: "white", fontSize: "12px", maxWidth: "260px", padding: "8px 10px" };
 const conditionUnderlineStyle = { borderBottom: "1px dotted rgba(255,255,255,0.7)", cursor: "help" };
 const damageUnderlineStyle = { borderBottom: "1px dotted rgba(255,150,100,0.8)", cursor: "help" };
+const persistentDamageUnderlineStyle = { borderBottom: "2px dotted rgba(255,100,60,0.9)", cursor: "help" };
 const healingUnderlineStyle = { borderBottom: "1px dotted rgba(100,220,130,0.8)", cursor: "help" };
 const breakdownUnderlineStyle = { cursor: "help", borderBottom: "1px dotted rgba(255,255,255,0.6)" };
 const logHeaderStyle = { color: "white", marginBottom: "12px" };
@@ -28,6 +29,30 @@ const ConditionPopover = ({ description, ...props }) => (
         </Popover.Body>
     </Popover>
 );
+
+const DamagePopover = ({ damageType, persistent, rollTooltip, modifiers, showDamageModifiers, ...props }) => {
+    const hasModifiers = showDamageModifiers && modifiers?.length > 0;
+    const cap = damageType ? damageType.charAt(0).toUpperCase() + damageType.slice(1) : "";
+    return (
+        <Popover {...props}>
+            <Popover.Body style={popoverBodyStyle}>
+                <div style={{ fontWeight: 600, marginBottom: (rollTooltip || hasModifiers) ? "4px" : 0 }}>
+                    {cap} damage{persistent ? " (persistent)" : ""}
+                </div>
+                {hasModifiers && (
+                    <div style={{ color: modChipColor(modifiers), fontSize: "11px", marginBottom: rollTooltip ? "4px" : 0 }}>
+                        {modChipDesc(modifiers)}
+                    </div>
+                )}
+                {rollTooltip && (
+                    <div style={{ color: "rgba(255,255,255,0.55)", fontSize: "11px", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "4px" }}>
+                        {rollTooltip}
+                    </div>
+                )}
+            </Popover.Body>
+        </Popover>
+    );
+};
 
 const modChipColor = (modifiers) => {
     if (!modifiers?.length) return null;
@@ -65,24 +90,28 @@ const BodyParts = ({ parts, showDamageModifiers }) => (
                 );
             }
             if (part.type === "typedDamage") {
-                const hasModifiers = showDamageModifiers && part.modifiers?.length > 0;
-                const chipColor = hasModifiers ? modChipColor(part.modifiers) : null;
-                const chipStyle = chipColor ? { color: chipColor, borderBottom: `1px dotted ${chipColor}`, cursor: "help" } : {};
-                const valueEl = part.tooltip
-                    ? (
-                        <OverlayTrigger trigger={HOVER_FOCUS} placement="top" overlay={<Tooltip id={`dmg-${i}`}>{part.tooltip}</Tooltip>}>
-                            <span style={damageUnderlineStyle}>{part.value}</span>
+                const underline = part.persistent ? persistentDamageUnderlineStyle : damageUnderlineStyle;
+                return (
+                    <span key={i}>
+                        <OverlayTrigger
+                            trigger={HOVER_FOCUS}
+                            placement="top"
+                            overlay={
+                                <DamagePopover
+                                    id={`dmg-pop-${i}`}
+                                    damageType={part.damageType}
+                                    persistent={part.persistent}
+                                    rollTooltip={part.tooltip}
+                                    modifiers={part.modifiers}
+                                    showDamageModifiers={showDamageModifiers}
+                                />
+                            }
+                        >
+                            <span style={underline}>{part.value}</span>
                         </OverlayTrigger>
-                    )
-                    : <span>{part.value}</span>;
-                const chipEl = hasModifiers
-                    ? (
-                        <OverlayTrigger trigger={HOVER_FOCUS} placement="top" overlay={<ConditionPopover description={modChipDesc(part.modifiers)} id={`mod-${i}`} />}>
-                            <span style={chipStyle}>({part.damageType})</span>
-                        </OverlayTrigger>
-                    )
-                    : <span>({part.damageType})</span>;
-                return <span key={i}>{valueEl} {chipEl}{part.suffix}</span>;
+                        {part.suffix}
+                    </span>
+                );
             }
             if (part.type === "damage") {
                 return (

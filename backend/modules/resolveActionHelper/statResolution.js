@@ -1,5 +1,6 @@
 import { effectModules } from "../effects/effectModules/effectModules.js";
 import STAT_EXPANSIONS from "../effects/statExpansions.js";
+import { addToStat } from "../../utility/statAccess.js";
 
 //Builds { statName: { bonusType: { add, subtract, addSource, subtractSource } } },
 //then flattens to { statName: { add, subtract } }
@@ -22,7 +23,7 @@ const resolveEffects = (character, newBonuses) => {
 
     //Apply effects, keeping highest add and highest subtract per bonusType (same type doesn't stack)
     for (const effect of character.effects || []) {
-        const statModifier = effectModules[effect.name?.toLowerCase()]?.statModifier;
+        const statModifier = effectModules[effect.slug?.toLowerCase()]?.statModifier;
         if (!statModifier) continue;
 
         //Expand any shorthand keys (e.g. "checks", "dexDcs") to real stat names
@@ -30,8 +31,8 @@ const resolveEffects = (character, newBonuses) => {
             statModifier.affectedStats.flatMap(key => STAT_EXPANSIONS[key] ?? [key])
         )];
         const { bonusType, operation } = statModifier;
-        //fixedValue overrides effect.number so binary conditions (maxLevel:1) can still apply a value != 1
-        const number = statModifier.fixedValue ?? effect.number;
+        //fixedValue overrides effect.value so binary conditions (maxLevel:1) can still apply a value != 1
+        const number = statModifier.fixedValue ?? effect.value;
 
         affectedStats.forEach(statName => {
             if (!statBonusMap[statName]) statBonusMap[statName] = {};
@@ -39,8 +40,8 @@ const resolveEffects = (character, newBonuses) => {
                 statBonusMap[statName][bonusType] = { add: 0, subtract: 0, addSource: null, subtractSource: null };
             }
             const entry = statBonusMap[statName][bonusType];
-            if (operation === "add" && number > entry.add) { entry.add = number; entry.addSource = effect.name; }
-            else if (operation === "subtract" && number > entry.subtract) { entry.subtract = number; entry.subtractSource = effect.name; }
+            if (operation === "add" && number > entry.add) { entry.add = number; entry.addSource = effect.slug; }
+            else if (operation === "subtract" && number > entry.subtract) { entry.subtract = number; entry.subtractSource = effect.slug; }
         });
     }
 
@@ -82,13 +83,17 @@ function destructureOffensiveBonuses(bonuses) {
 
 export default function applyStatChanges(bonuses, character) {
     const { result, breakdown } = resolveEffects(character, destructureOffensiveBonuses(bonuses));
-    const stats = { ...character.stats, skills: { ...(character.stats.skills ?? {}) } };
+    //Clone the namespaced groups so deltas don't mutate the original character's stats
+    const src = character.stats ?? {};
+    const stats = {
+        ...src,
+        attributes: { ...(src.attributes ?? {}) },
+        saves: { ...(src.saves ?? {}) },
+        skills: { ...(src.skills ?? {}) },
+    };
 
     for (const [statName, { add, subtract }] of Object.entries(result)) {
-        const delta = add - subtract;
-        //Use ?? 0 to guard against undefined stats on partially-filled characters
-        if (statName in stats) stats[statName] = (stats[statName] ?? 0) + delta;
-        else if (statName in stats.skills) stats.skills[statName] = (stats.skills[statName] ?? 0) + delta;
+        addToStat(stats, statName, add - subtract);
     }
 
     return { ...character, stats, _breakdown: breakdown };

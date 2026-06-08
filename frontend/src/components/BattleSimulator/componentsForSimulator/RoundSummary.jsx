@@ -151,8 +151,9 @@ export function RoundSummary({ round, actions, toggles }) {
     const byActor = useMemo(() => {
         const result = {};
         actions.forEach(entry => {
-            if (!result[entry.actorName]) result[entry.actorName] = { total: 0, luckDelta: null, healingLuckDelta: null, rows: [] };
+            if (!result[entry.actorName]) result[entry.actorName] = { total: 0, luckDelta: null, healingLuckDelta: null, rows: [], critSpecImpacts: [] };
             result[entry.actorName].total += entry.totalDamage;
+            result[entry.actorName].critSpecImpacts.push(...(entry.critSpecImpacts ?? []));
             if (entry.totalLuckDelta !== null && entry.totalLuckDelta !== undefined) {
                 result[entry.actorName].luckDelta = (result[entry.actorName].luckDelta ?? 0) + entry.totalLuckDelta;
             }
@@ -178,6 +179,7 @@ export function RoundSummary({ round, actions, toggles }) {
                     healingTooltip: t.healingTooltip ?? null,
                     healingLuckDelta: t.healingLuckDelta ?? null,
                     dmgModifierInfo: t.dmgModifierInfo ?? [],
+                    wasKilled: t.wasKilled ?? false,
                 });
             });
         });
@@ -242,6 +244,12 @@ export function RoundSummary({ round, actions, toggles }) {
                                               </OverlayTrigger>
                                             : `${row.damage} dmg`
                                         )}
+                                        {row.damage > 0 && row.wasKilled && (
+                                            <OverlayTrigger trigger={["hover", "focus"]} placement="top"
+                                                overlay={<Tooltip id={`recap-killed-${i}`}>Damage limited — {row.target} was killed by this attack</Tooltip>}>
+                                                <span className="text-danger ms-1" style={{ cursor: "help" }}>💀</span>
+                                            </OverlayTrigger>
+                                        )}
                                         {row.healing > 0 && (row.healingTooltip
                                             ? <OverlayTrigger trigger={["hover", "focus"]} placement="top"
                                                 overlay={<Tooltip id={`recap-heal-${i}`}>{row.healingTooltip}</Tooltip>}>
@@ -264,6 +272,11 @@ export function RoundSummary({ round, actions, toggles }) {
                             </div>
                             );
                         })}
+                        {toggles.critSpec && data.critSpecImpacts.map((imp, k) => (
+                            <div key={`cs-${k}`} className={`ps-3 ${imp.kind === "applied" ? "text-info" : "text-muted"}`} style={actionRowStyle}>
+                                ↳ {imp.text}
+                            </div>
+                        ))}
                         {((toggles.buffs && (buffGain > 0 || debuffGain < 0)) || (toggles.offGuard && offGuardGain > 0) || (toggles.luck && data.luckDelta !== null)) && (
                             <div className="mt-1 pt-1" style={actorFooterStyle}>
                                 {toggles.buffs && buffGain > 0 && (

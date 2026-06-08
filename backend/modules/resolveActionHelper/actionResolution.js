@@ -8,9 +8,12 @@ export function applyDamageModifiers(rawDamage, damageType, char) {
     if ((char.immunities ?? []).some(i => i.toLowerCase() === type)) return 0;
     const res = (char.resistances ?? []).find(r => r.damageType.toLowerCase() === type);
     const wk = (char.weaknesses ?? []).find(w => w.damageType.toLowerCase() === type);
-    let damage = res ? Math.max(0, rawDamage - res.value) : rawDamage;
+    //PF2e applies weakness then resistance, clamping the total at 0 only at the end —
+    //so heavy resistance can fully cancel a weakened hit (clamping mid-way would over-count).
+    let damage = rawDamage;
     if (wk) damage += wk.value;
-    return damage;
+    if (res) damage -= res.value;
+    return Math.max(0, damage);
 }
 
 //Returns modifier entries that were applied, for display in the damage type chip
@@ -37,7 +40,7 @@ const CONDITION_COVERS = {
 //True if a more-severe condition already makes `name` redundant
 function isCoveredByHigher(name, effects) {
     return Object.entries(CONDITION_COVERS).some(
-        ([superior, covered]) => covered.includes(name) && effects.some(e => e.name === superior)
+        ([superior, covered]) => covered.includes(name) && effects.some(e => e.slug === superior)
     );
 }
 
@@ -59,7 +62,7 @@ export const healingResolution = (characters, actionInfo) => {
         const healing = actionInfo.avgMultiplier !== undefined
             ? avgOfDice(actionInfo.number, actionInfo.avgMultiplier)
             : sumOfDice(actionInfo.number, actionInfo.multiplier);
-        const maxHealth = character.stats.maxHealth ?? character.stats.health ?? 0;
+        const maxHealth = character.stats.maxHealth ?? character.stats.attributes?.hp ?? 0;
         return { ...character, stats: { ...character.stats, currentHealth: Math.min(maxHealth, Math.max(0, character.stats.currentHealth + healing)) } };
     });
 };
@@ -86,22 +89,22 @@ export const conditionResolution = (characters, actionInfo) => {
             if (isCoveredByHigher(actionName, effects)) return character;
             //Remove less-severe conditions that this one supersedes
             const toRemove = new Set(supersededBy(actionName));
-            if (toRemove.size) effects = effects.filter(e => !toRemove.has(e.name));
+            if (toRemove.size) effects = effects.filter(e => !toRemove.has(e.slug));
 
-            const existingEffect = effects.find(e => e.name === actionName);
+            const existingEffect = effects.find(e => e.slug === actionName);
             if (existingEffect) {
                 //Apply highest level; always refresh duration (PF2e: reapplication refreshes duration)
-                const newLevel = Math.max(existingEffect.number, condLevel);
-                effects = effects.map(e => e.name === actionName ? { ...e, number: newLevel, duration } : e);
+                const newLevel = Math.max(existingEffect.value, condLevel);
+                effects = effects.map(e => e.slug === actionName ? { ...e, value: newLevel, duration } : e);
             } else {
                 if (!mod) {
                     console.error(`Unknown effect module: ${actionName}`);
                     return { ...character, effects };
                 }
-                effects = [...effects, { name: actionName, number: condLevel, description: mod.description, duration }];
+                effects = [...effects, { slug: actionName, value: condLevel, description: mod.description, duration }];
             }
         } else {
-            effects = effects.filter(e => e.name !== actionName);
+            effects = effects.filter(e => e.slug !== actionName);
         }
         return { ...character, effects };
     });

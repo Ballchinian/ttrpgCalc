@@ -15,19 +15,25 @@ const characterSchema = new mongoose.Schema({
         required: true
     },
     characterName: { type: String, required: true, minlength: 1, maxlength: 100 },
+    //Namespaced (Foundry-aligned): attributes / saves / perception / skills.
+    //attributes also holds the calculator-specific attack mods (str, strHit, dexHit), which
+    //Foundry derives per-weapon. hp is the base max HP that seeds the battle store's current/maxHealth.
     stats: {
-        ac: { type: Number, min: -9999, max: 9999, default: 0 },
-        dc: { type: Number, min: -9999, max: 9999, default: 0 },
-        str: { type: Number, min: -9999, max: 9999, default: 0 },
-        strHit: { type: Number, min: -9999, max: 9999, default: 0 },
-        dexHit: { type: Number, min: -9999, max: 9999, default: 0 },
-        //health is the base max HP stored on the character: used to seed maxHealth/currentHealth in the battle store
-        health: { type: Number, min: 0, max: 99999, default: 0 },
-        reflex: { type: Number, min: -9999, max: 9999, default: 0 },
-        fortitude: { type: Number, min: -9999, max: 9999, default: 0 },
-        will: { type: Number, min: -9999, max: 9999, default: 0 },
+        attributes: {
+            ac: { type: Number, min: -9999, max: 9999, default: 0 },
+            dc: { type: Number, min: -9999, max: 9999, default: 0 },
+            hp: { type: Number, min: 0, max: 99999, default: 0 },
+            str: { type: Number, min: -9999, max: 9999, default: 0 },
+            strHit: { type: Number, min: -9999, max: 9999, default: 0 },
+            dexHit: { type: Number, min: -9999, max: 9999, default: 0 },
+        },
+        saves: {
+            fortitude: { type: Number, min: -9999, max: 9999, default: 0 },
+            reflex: { type: Number, min: -9999, max: 9999, default: 0 },
+            will: { type: Number, min: -9999, max: 9999, default: 0 },
+        },
+        perception: { type: Number, min: -9999, max: 9999, default: 0 },
         skills: {
-            perception: { type: Number, min: -9999, max: 9999, default: 0 },
             athletics: { type: Number, min: -9999, max: 9999, default: 0 },
             acrobatics: { type: Number, min: -9999, max: 9999, default: 0 },
             arcana: { type: Number, min: -9999, max: 9999, default: 0 },

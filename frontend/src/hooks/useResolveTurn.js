@@ -3,6 +3,7 @@ import { useGameDataStore } from '../store/gameDataStore';
 import { apiFetch } from '../auth';
 import { BACKEND_BASE_URL } from '../config';
 import { applyPendingAction } from '../utils/applyPendingAction';
+import { queueCritSpecPrompts } from '../utils/critSpecPrompts';
 
 //Encapsulates the full async turn-resolution pipeline.
 //Uses getState() so it always reads the latest values, not stale closure values.
@@ -65,6 +66,14 @@ export async function resolveTurn() {
     if (!actionData) { actionData = action.selected; }
     if (!actionType) { actionType = "global_action"; }
 
+    const critSpecGroup = action.critSpec && actionType === "weapon"
+        ? (allItems.weapons?.find(w => w.name === action.selected)?.group ?? null)
+        : null;
+    //Weapon damage dice drive the axe crit spec (it deals the rolled weapon dice to an adjacent creature)
+    const critSpecWeaponDice = critSpecGroup
+        ? (actionData?.outcomes?.success?.effects?.find(e => e.type === "damage")?.number ?? null)
+        : null;
+
     const battleSession = (() => {
         try { return JSON.parse(localStorage.getItem("battleSession") || "{}"); }
         catch (err) { console.warn("Failed to parse battleSession:", err); return {}; }
@@ -81,9 +90,9 @@ export async function resolveTurn() {
         name: t.name,
         side: t.side,
         stats: { currentHealth: t.stats?.currentHealth ?? 0 },
-        effects: (t.effects ?? []).map(e => ({ name: e.name, number: e.number })),
+        effects: (t.effects ?? []).map(e => ({ slug: e.slug, value: e.value })),
     }));
-    const actorEffectsBefore = (activeActor.effects ?? []).map(e => ({ name: e.name, number: e.number }));
+    const actorEffectsBefore = (activeActor.effects ?? []).map(e => ({ slug: e.slug, value: e.value }));
     const currentRound = round ?? 1;
 
     //Resolve with backend
@@ -98,6 +107,7 @@ export async function resolveTurn() {
                 diceMode: settings.diceMode,
                 offensiveBonuses,
                 characterDefensiveBonuses,
+                critSpecGroup,
             }),
         });
 
@@ -148,10 +158,24 @@ export async function resolveTurn() {
 
         //All modes route through pendingAction: auto modes apply immediately, choose waits for user
         if (data.pendingOutcomes) {
-            setPendingAction({ mode: "choose", perTarget: data.pendingOutcomes, recapContext, chosenOutcomes: {}, ignoreHP: settings.ignoreHP });
+            //Carry crit spec context so applyPendingAction can queue prompts once outcomes are chosen
+            setPendingAction({ mode: "choose", perTarget: data.pendingOutcomes, recapContext, chosenOutcomes: {}, ignoreHP: settings.ignoreHP, critSpecGroup, critSpecWeaponDice });
         } else {
             setPendingAction({ mode: "auto", updatedTargets: data.updatedTargetCharacters, ignoreHP: settings.ignoreHP, recapContext });
             applyPendingAction();
+
+            //Queue any crit spec prompts (saves, axe adjacent damage) for critically-hit targets.
+            //Choose mode is handled in applyPendingAction after the user picks outcomes.
+            if (critSpecGroup) {
+                const crittedIds = targetCharacters
+                    .filter(t => {
+                        const ro = data.actionStats?.[t.id]?.rollOutcome;
+                        //luck: real dice roll; avg: most likely outcome
+                        return ro?.outcomeKey === "criticalSuccess" || ro?.avgOutcomeKey === "criticalSuccess";
+                    })
+                    .map(t => t.id);
+                queueCritSpecPrompts({ group: critSpecGroup, crittedIds, diceMode: settings.diceMode, actor: activeActor, weaponDice: critSpecWeaponDice, recapContext });
+            }
         }
 
         setLog(data.log || {});

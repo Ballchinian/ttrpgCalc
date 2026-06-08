@@ -7,7 +7,7 @@ const D20_FACES = 20;
 
 //multiplierTable: an object keyed by outcome (e.g. MULTIPLIER_TABLE or BASIC_SAVE_MULTIPLIER_TABLE)
 export default function likelihoodTable(targetDC, rollModifier, multiplierTable, critThreshold = 20) {
-    const chanceOfOutcome = { critSuccess: 0, success: 0, failure: 0, critFailure: 0 };
+    const chanceOfOutcome = { criticalSuccess: 0, success: 0, failure: 0, criticalFailure: 0 };
     let totalAvgMultiplier = 0;
 
     //This is the number we need to meet on a d20, negative means better chance to hit
@@ -17,7 +17,7 @@ export default function likelihoodTable(targetDC, rollModifier, multiplierTable,
         if (roll >= critThreshold) degreeOfSuccess++;
         else if (roll === 1) degreeOfSuccess--;
         let outcomeIndex = 0;
-        //critFailure
+        //criticalFailure
         if (targetNumber - roll >= CRIT_MARGIN) {
             //nat-20 still upgrades from crit failure to failure; nat-1 cannot go below crit failure
             if (degreeOfSuccess === -1) degreeOfSuccess = 0;

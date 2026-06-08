@@ -4,6 +4,7 @@ import { useBattleStore } from "../../../store/battleStore";
 import { useGameDataStore } from "../../../store/gameDataStore";
 import { resolveTurn } from "../../../hooks/useResolveTurn";
 import SearchbarToggle from "../../utility/searchbarToggle";
+import { CRIT_SPEC_DEFS } from "../../../data/critSpecDefs";
 
 const cardStyle = { width: "100%", padding: "10px", marginBottom: "20px", height: "auto" };
 const disabledMapStyle = {
@@ -24,9 +25,11 @@ function ActionPanel() {
     const error = useBattleStore(state => state.error);
     const setSelectedAction = useBattleStore(state => state.setSelectedAction);
     const setChoosingAction = useBattleStore(state => state.setChoosingAction);
+    const setCritSpec = useBattleStore(state => state.setCritSpec);
     const updateCharacterInList = useBattleStore(state => state.updateCharacterInList);
     const setError = useBattleStore(state => state.setError);
     const resetTargetMode = useBattleStore(state => state.resetTargetMode);
+    const pendingNichePrompts = useBattleStore(state => state.pendingNichePrompts);
     const getLocalActionNames = useBattleStore(state => state.getLocalActionNames);
 
     const globalActionNames = useGameDataStore(state => state.globalActionNames);
@@ -42,6 +45,12 @@ function ActionPanel() {
     //Weapons always count as attacks (attack trait is required/unremovable): use selectedType as a direct fallback
     //instead of relying on allItems being fresh enough to resolve the weapon by name
     const countsAsAttack = action.selectedType === "weapon" || traitProfile.countsAsAttack;
+
+    const selectedWeaponGroup = action.selectedType === "weapon"
+        ? (allItems.weapons?.find(w => w.name === action.selected)?.group ?? null)
+        : null;
+    const critSpecDef = selectedWeaponGroup ? (CRIT_SPEC_DEFS[selectedWeaponGroup] ?? null) : null;
+    const showCritSpec = action.selectedType === "weapon";
 
     //Memoize localStorage read: getLocalActionNames re-parses JSON on every call
     //Use actor id as dep, not the object reference (new object every render)
@@ -138,7 +147,33 @@ function ActionPanel() {
                     )}
                 </div>
 
-                <Button variant="success" className="w-100" onClick={handleTurnCommence} disabled={resolving || !target.activeActor || !selectedAction}>
+                {showCritSpec && (
+                    <div className="d-flex align-items-center justify-content-between mb-3 px-1">
+                        <OverlayTrigger
+                            trigger={["hover", "focus"]}
+                            placement="top"
+                            overlay={
+                                <Tooltip id="crit-spec-tooltip">
+                                    {critSpecDef
+                                        ? <><strong>{selectedWeaponGroup} crit spec:</strong><br />{critSpecDef.description}</>
+                                        : "No weapon group set — crit spec effect must be applied manually."
+                                    }
+                                </Tooltip>
+                            }
+                        >
+                            <span style={{ cursor: "help" }}>Crit Spec</span>
+                        </OverlayTrigger>
+                        <input
+                            type="checkbox"
+                            id="crit-spec-toggle"
+                            checked={action.critSpec ?? false}
+                            onChange={e => setCritSpec(e.target.checked)}
+                            style={{ width: "16px", height: "16px", cursor: "pointer", flexShrink: 0, display: "block" }}
+                        />
+                    </div>
+                )}
+
+                <Button variant="success" className="w-100" onClick={handleTurnCommence} disabled={resolving || !target.activeActor || !selectedAction || pendingNichePrompts.length > 0}>
                     {resolving ? "Resolving..." : "Turn Commence!"}
                 </Button>
 

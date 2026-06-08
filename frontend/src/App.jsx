@@ -1,6 +1,8 @@
 import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { refreshAccessToken } from './auth';
+import { useBattleStore } from './store/battleStore';
+import { useRecapStore } from './store/recapStore';
 import ErrorBoundary from './components/utility/ErrorBoundary.jsx';
 import Layout from './components/Navbar/Layout';
 import LoginPage from './components/LoginPage/LoginPage';
@@ -36,6 +38,11 @@ function App() {
 
     if (!ready) return null;
 
+    const handleLogin = () => {
+        useBattleStore.getState().resetBattle();
+        useRecapStore.getState().clearRecap();
+        setAuthed(true);
+    };
     const handleLogout = () => setAuthed(false);
     const protect = (children) => <ProtectedRoute authed={authed}>{children}</ProtectedRoute>;
     const wrap = (page) => protect(<Layout onLogout={handleLogout}>{page}</Layout>);
@@ -44,7 +51,7 @@ function App() {
         <BrowserRouter>
         <ErrorBoundary>
         <Routes>
-            <Route path="/" element={authed ? <Navigate to="/home" replace /> : <LoginPage onLogin={() => setAuthed(true)} />} />
+            <Route path="/" element={authed ? <Navigate to="/home" replace /> : <LoginPage onLogin={handleLogin} />} />
             <Route path="/register" element={authed ? <Navigate to="/home" replace /> : <RegisterPage />} />
             <Route path="/reset-password/:token" element={authed ? <Navigate to="/home" replace /> : <ResetPassword />} />
             <Route path="/home" element={wrap(<Homepage />)} />

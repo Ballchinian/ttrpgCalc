@@ -42,11 +42,16 @@ const TOGGLE_DEFS = [
         label: "Actions",
         desc: "Show a per-action summary: total damage dealt and conditions applied by each action this round.",
     },
+    {
+        key: "critSpec",
+        label: "Crit Spec",
+        desc: "Show what each weapon's critical specialization did after a critical hit — extra damage, conditions, or save results.",
+    },
 ];
 
 function RecapPanel() {
     const [show, setShow] = useState(false);
-    const [toggles, setToggles] = useState({ buffs: true, successRate: true, offGuard: false, thresholds: false, map: false, luck: false, actions: false });
+    const [toggles, setToggles] = useState({ buffs: true, successRate: true, offGuard: false, thresholds: false, map: false, luck: false, actions: false, critSpec: true });
 
     const recapHistory = useRecapStore(state => state.recapHistory);
     const clearRecap = useRecapStore(state => state.clearRecap);

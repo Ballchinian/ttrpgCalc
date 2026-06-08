@@ -7,6 +7,8 @@ import restrained from "../restrained.js";
 import clumsy from "../clumsy.js";
 import fleeing from "../fleeing.js";
 import persistent from "../persistent.js";
+import stunned from "../stunned.js";
+import slowed from "../slowed.js";
 
 //All registered effect definitions keyed by condition name
 export const effectModules = {
@@ -19,6 +21,8 @@ export const effectModules = {
     clumsy,
     fleeing,
     persistent,
+    stunned,
+    slowed,
 };
 
 export const offGuardEffects = Object.values(effectModules)
