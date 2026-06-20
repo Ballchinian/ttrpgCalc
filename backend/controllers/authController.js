@@ -7,13 +7,32 @@ import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 dotenv.config();
 
+//Converts 7 days into miliseconds for token expiry
 const REFRESH_TTL = 7 * 24 * 60 * 60 * 1000;
 
-//Module-level singleton so the SMTP connection pool is reused across requests
-const emailTransporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: { user: process.env.EMAIL_USERNAME, pass: process.env.EMAIL_PASSWORD },
-});
+/* Email transport (module-level singleton so the SMTP connection pool is reused across requests).
+   Provider-agnostic: set SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS to send through any SMTP service
+   (Resend, Brevo, SendGrid, ...). Falls back to the original Gmail service when SMTP_HOST is unset,
+   so the existing EMAIL_USERNAME/EMAIL_PASSWORD setup keeps working with no config change. Switching
+   providers later is purely an env-var change - no code edits. */
+const smtpPort = Number(process.env.SMTP_PORT) || 587;
+const emailTransporter = nodemailer.createTransport(
+    process.env.SMTP_HOST
+        ? {
+            host: process.env.SMTP_HOST,
+            port: smtpPort,
+            secure: smtpPort === 465, //465 = implicit TLS; 587/2525 = STARTTLS (upgraded after connect)
+            auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        }
+        : {
+            service: "gmail",
+            auth: { user: process.env.EMAIL_USERNAME, pass: process.env.EMAIL_PASSWORD },
+        }
+);
+
+/* Address the reset email is sent from. Prefer an explicit EMAIL_FROM (e.g. a verified
+   "no-reply@yourdomain.com"); otherwise fall back to the authenticated SMTP/Gmail user. */
+const EMAIL_FROM = process.env.EMAIL_FROM || process.env.SMTP_USER || process.env.EMAIL_USERNAME;
 
 //Store a sha256 hash of tokens in DB so a DB breach can't be used to hijack sessions
 const hashToken = (raw) => crypto.createHash("sha256").update(raw).digest("hex");
@@ -122,7 +141,7 @@ export const requestResetPassword = async(req, res) => {
         try {
             await user.save();
             await emailTransporter.sendMail({
-                from: process.env.EMAIL_USERNAME,
+                from: EMAIL_FROM,
                 to: email,
                 subject: "Password Reset Request",
                 html: `<p>Click <a href="${FRONTEND_BASE_URL}/reset-password/${rawToken}">here</a> to reset your password. Link expires in 1 hour.</p>`
@@ -176,7 +195,7 @@ export const confirmResetPassword = async (req, res) => {
     }
 };
 
-//refreshToken: stored in DB so it can be invalidated server-side, keeps JWT TTL short without kicking the user out
+//refreshToken: stored in DB so it can be invalidated server side, keeps JWT TTL short without kicking the user out
 export const refresh = async (req, res) => {
     try {
         const { refreshToken } = req.cookies;

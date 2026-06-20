@@ -58,12 +58,12 @@ function ConditionImpactRow({ impact, toggles }) {
     const brackets = [];
 
     if (toggles.successRate && !isLuck && impact.hitMultiplier !== null && impact.hitMultiplier !== undefined && impact.hitMultiplier !== 1)
-        brackets.push(`${impact.hitMultiplier}× success rate`);
+        brackets.push(`${impact.hitMultiplier}* success rate`);
 
     if (!isLuck && totalGain !== 0)
         brackets.push(`~${totalGain} exp dmg`);
     if (isLuck) {
-        brackets.push(`${OUTCOME_LABELS[impact.from]} → ${OUTCOME_LABELS[impact.to]}`);
+        brackets.push(`${OUTCOME_LABELS[impact.from]} -> ${OUTCOME_LABELS[impact.to]}`);
         if (totalGain !== 0) brackets.push(`${totalGain} dmg`);
     }
 
@@ -81,12 +81,12 @@ function OffGuardRow({ impact, toggles }) {
     const brackets = [];
 
     if (toggles.successRate && !isLuck && impact.hitMultiplier !== null && impact.hitMultiplier !== undefined && impact.hitMultiplier !== 1)
-        brackets.push(`${impact.hitMultiplier}× success rate`);
+        brackets.push(`${impact.hitMultiplier}* success rate`);
 
     if (!isLuck)
         brackets.push(`~${impact.damageGain} exp dmg`);
 
-    const luckTransition = isLuck ? `${OUTCOME_LABELS[impact.from]} → ${OUTCOME_LABELS[impact.to]}` : null;
+    const luckTransition = isLuck ? `${OUTCOME_LABELS[impact.from]} -> ${OUTCOME_LABELS[impact.to]}` : null;
     const luckDamage = isLuck && impact.damageGain !== 0 ? impact.damageGain : null;
 
     return (
@@ -131,13 +131,13 @@ function ActionSummary({ actions }) {
                     if (!condCounts[key]) condCounts[key] = { label: level > 1 ? `${conditionName} ${level}` : conditionName, count: 0 };
                     condCounts[key].count++;
                 });
-                const condParts = Object.values(condCounts).map(({ label, count }) => count > 1 ? `${count}× ${label}` : label);
+                const condParts = Object.values(condCounts).map(({ label, count }) => count > 1 ? `${count}* ${label}` : label);
 
                 return (
                     <div key={actionName} className="d-flex justify-content-between ps-3 text-muted" style={actionRowStyle}>
                         <span>
                             ↳ {actionName}
-                            {condParts.length > 0 && <span className="text-warning-emphasis ms-2">→ {condParts.join(", ")}</span>}
+                            {condParts.length > 0 && <span className="text-warning-emphasis ms-2">-> {condParts.join(", ")}</span>}
                         </span>
                         {data.totalDamage > 0 && <span>{data.totalDamage} dmg</span>}
                     </div>
@@ -169,6 +169,7 @@ export function RoundSummary({ round, actions, toggles }) {
                     healing: t.healingReceived,
                     conditionImpacts: t.conditionImpacts ?? [],
                     offGuardImpacts: t.offGuardImpacts ?? [],
+                    augmentImpacts: t.augmentImpacts ?? [],
                     outcomeKey: t.outcomeKey,
                     diceResult: t.diceResult,
                     avgOutcomeKey: t.avgOutcomeKey,
@@ -186,6 +187,20 @@ export function RoundSummary({ round, actions, toggles }) {
         return result;
     }, [actions]);
 
+    //Per-round, per-condition damage impact. Replaces the old collective "buffs" total, which summed
+    //combined conditionImpacts and so never reconciled with this per-condition (perConditionImpacts)
+    //breakdown. Same source as the session breakdown, so the round rows sum to the session totals.
+    const roundTotalDamage = useMemo(() => actions.reduce((s, e) => s + (e.totalDamage ?? 0), 0), [actions]);
+    const roundConditionBreakdown = useMemo(() => {
+        const map = {};
+        actions.forEach(entry => {
+            Object.entries(entry.conditionBreakdown ?? {}).forEach(([name, gain]) => {
+                map[name] = (map[name] ?? 0) + gain;
+            });
+        });
+        return Object.entries(map).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+    }, [actions]);
+
     return (
         <Accordion.Item eventKey={String(round)}>
             <Accordion.Header>Round {round}</Accordion.Header>
@@ -194,17 +209,11 @@ export function RoundSummary({ round, actions, toggles }) {
                 {toggles.actions && <ActionSummary actions={actions} />}
                 <p className="fw-bold mb-1">Damage Dealt</p>
                 {Object.entries(byActor).map(([actor, data]) => {
-                    const conditionGain = data.rows.reduce((sum, row) =>
-                        sum + row.conditionImpacts.reduce((s, imp) => s + (imp.damageGain ?? 0), 0), 0
-                    );
                     const offGuardGain = data.rows.reduce((sum, row) =>
                         sum + row.offGuardImpacts.reduce((s, imp) => s + (imp.damageGain ?? 0), 0), 0
                     );
-                    const buffGain = data.rows.reduce((sum, row) => sum + row.conditionImpacts.reduce((s, i) => s + Math.max(0, i.damageGain ?? 0), 0), 0);
-                    const debuffGain = data.rows.reduce((sum, row) => sum + row.conditionImpacts.reduce((s, i) => s + Math.min(0, i.damageGain ?? 0), 0), 0);
                     //Percentages are only meaningful in avg mode (expected-value units): suppress in luck/choose
                     const isAvgMode = data.rows.every(r => !r.outcomeKey);
-                    const baseline = data.total - conditionGain;
                     const ogPct = isAvgMode && data.total > 0 ? Math.round((offGuardGain / data.total) * 100) : null;
 
                     return (
@@ -233,7 +242,7 @@ export function RoundSummary({ round, actions, toggles }) {
                             return (
                             <div key={i}>
                                 <div className="d-flex justify-content-between ps-3 text-muted" style={actionRowStyle}>
-                                    <span>↳ {row.action} → {row.target}{brackets}</span>
+                                    <span>↳ {row.action} -> {row.target}{brackets}</span>
                                     <span>
                                         {row.damage > 0 && (row.diceTooltip
                                             ? <OverlayTrigger trigger={["hover", "focus"]} placement="top"
@@ -246,7 +255,7 @@ export function RoundSummary({ round, actions, toggles }) {
                                         )}
                                         {row.damage > 0 && row.wasKilled && (
                                             <OverlayTrigger trigger={["hover", "focus"]} placement="top"
-                                                overlay={<Tooltip id={`recap-killed-${i}`}>Damage limited — {row.target} was killed by this attack</Tooltip>}>
+                                                overlay={<Tooltip id={`recap-killed-${i}`}>Damage limited - {row.target} was killed by this attack</Tooltip>}>
                                                 <span className="text-danger ms-1" style={{ cursor: "help" }}>💀</span>
                                             </OverlayTrigger>
                                         )}
@@ -259,11 +268,16 @@ export function RoundSummary({ round, actions, toggles }) {
                                               </OverlayTrigger>
                                             : ` ${row.healing} heal`
                                         )}
-                                        {row.damage === 0 && row.healing === 0 && "—"}
+                                        {row.damage === 0 && row.healing === 0 && "-"}
                                     </span>
                                 </div>
                                 {toggles.buffs && row.conditionImpacts.map((impact, j) => (
                                     <ConditionImpactRow key={j} impact={impact} toggles={toggles} />
+                                ))}
+                                {toggles.buffs && row.augmentImpacts.map((aug, j) => (
+                                    <div key={`aug-${j}`} className="ps-5 text-info" style={condImpactRowStyle}>
+                                        ↳ {aug.label}: +{aug.damage} dmg
+                                    </div>
                                 ))}
                                 {toggles.offGuard && row.offGuardImpacts.map((impact, j) => (
                                     <OffGuardRow key={j} impact={impact} toggles={toggles} />
@@ -277,18 +291,8 @@ export function RoundSummary({ round, actions, toggles }) {
                                 ↳ {imp.text}
                             </div>
                         ))}
-                        {((toggles.buffs && (buffGain > 0 || debuffGain < 0)) || (toggles.offGuard && offGuardGain > 0) || (toggles.luck && data.luckDelta !== null)) && (
+                        {((toggles.offGuard && offGuardGain > 0) || (toggles.luck && data.luckDelta !== null)) && (
                             <div className="mt-1 pt-1" style={actorFooterStyle}>
-                                {toggles.buffs && buffGain > 0 && (
-                                    <div className="text-success ps-2">
-                                        buffs: +{buffGain} dmg{isAvgMode && baseline > 0 ? ` (+${Math.round((buffGain / baseline) * 100)}%)` : ""}
-                                    </div>
-                                )}
-                                {toggles.buffs && debuffGain < 0 && (
-                                    <div className="text-danger ps-2">
-                                        debuffs: {debuffGain} dmg{isAvgMode && baseline > 0 ? ` (${Math.round((debuffGain / baseline) * 100)}%)` : ""}
-                                    </div>
-                                )}
                                 {toggles.offGuard && offGuardGain > 0 && (
                                     <div className="text-muted ps-2">
                                         off-guard: +{offGuardGain} dmg{ogPct !== null ? ` (+${ogPct}%)` : ""}
@@ -309,6 +313,20 @@ export function RoundSummary({ round, actions, toggles }) {
                     </div>
                     );
                 })}
+
+                {toggles.buffs && roundConditionBreakdown.length > 0 && (
+                    <div className="mt-2 pt-1 text-muted" style={{ fontSize: "0.85em", borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+                        <span className="fw-semibold">Condition impact: </span>
+                        {roundConditionBreakdown.map(([name, gain], i) => {
+                            const pct = roundTotalDamage > 0 ? Math.round((gain / roundTotalDamage) * 100) : null;
+                            return (
+                                <span key={name} className={gain > 0 ? "text-success" : "text-danger"}>
+                                    {i > 0 && ", "}{name}: {gain > 0 ? "+" : ""}{gain} dmg{pct !== null ? ` (${pct > 0 ? "+" : ""}${pct}%)` : ""}
+                                </span>
+                            );
+                        })}
+                    </div>
+                )}
 
             </Accordion.Body>
         </Accordion.Item>

@@ -12,6 +12,17 @@ export function getToken() {
     return accessToken;
 }
 
+//Decodes the current access token's payload to get the logged-in user's id (used to scope the
+//persisted battle to a user so switching accounts doesn't load the previous user's battle)
+export function getUserID() {
+    if (!accessToken) return null;
+    try {
+        return JSON.parse(atob(accessToken.split(".")[1])).userID ?? null;
+    } catch {
+        return null;
+    }
+}
+
 export async function refreshAccessToken() {
     if (refreshPromise) return refreshPromise;
     refreshPromise = (async () => {

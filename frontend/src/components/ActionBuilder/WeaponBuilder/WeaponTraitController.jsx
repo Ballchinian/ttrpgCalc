@@ -49,7 +49,7 @@ export default function WeaponTraitDetails({ weaponData, setWeaponData, traitDef
                 effectOrTrait="trait"
             />
 
-            <Button variant="outline-light " size="sm" onClick={() => setOpen(true)}>
+            <Button variant="outline-primary" size="sm" onClick={() => setOpen(true)}>
                 Add
             </Button>
 
@@ -60,6 +60,7 @@ export default function WeaponTraitDetails({ weaponData, setWeaponData, traitDef
                     existingTraits={traits}
                     onConfirm={addTrait}
                     onCancel={() => setOpen(false)}
+                    context="weapon"
                 />
                 </Modal.Body>
             </Modal>

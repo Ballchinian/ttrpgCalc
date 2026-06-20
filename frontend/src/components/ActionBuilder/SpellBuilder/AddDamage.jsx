@@ -7,6 +7,7 @@ function AddDamage({ onConfirm, onCancel }) {
     const [diceInput, setDiceInput] = useState("");
     const [damageType, setDamageType] = useState(null);
     const [persistent, setPersistent] = useState(false);
+    const [recoveryDC, setRecoveryDC] = useState(15);
     const [errors, setErrors] = useState({});
 
     //Read from store, gameDataStore fetches damageTypes on app mount, no per-modal request needed
@@ -22,8 +23,9 @@ function AddDamage({ onConfirm, onCancel }) {
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) return;
 
-        //category mirrors Foundry's damage-instance categories; only "persistent" is modelled for now
-        onConfirm({ type: "damage", number: damageNumber, damageType, multiplier: 1, ...(persistent && { category: "persistent" }) });
+        //category mirrors Foundry's damage-instance categories; only "persistent" is modelled for now.
+        //recoveryDC is the flat-check DC to end the persistent damage (default 15).
+        onConfirm({ type: "damage", number: damageNumber, damageType, multiplier: 1, ...(persistent && { category: "persistent", recoveryDC: Number(recoveryDC) || 15 }) });
     };
 
     return (
@@ -74,12 +76,25 @@ function AddDamage({ onConfirm, onCancel }) {
                 />
             </Form.Group>
 
+            {persistent && (
+                <Form.Group className="mb-2">
+                    <Form.Label>Recovery DC (flat check to end)</Form.Label>
+                    <Form.Control
+                        type="number"
+                        value={recoveryDC}
+                        min={2}
+                        max={60}
+                        onChange={(e) => setRecoveryDC(e.target.value)}
+                    />
+                </Form.Group>
+            )}
+
             <Row className="justify-content-center mt-3">
                 <Col xs="5">
-                    <Button variant="primary" onClick={handleConfirm}>Confirm</Button>
+                    <Button variant="success" onClick={handleConfirm}>Confirm</Button>
                 </Col>
                 <Col xs="3">
-                    <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+                    <Button variant="outline-secondary" onClick={onCancel}>Cancel</Button>
                 </Col>
             </Row>
         </div>

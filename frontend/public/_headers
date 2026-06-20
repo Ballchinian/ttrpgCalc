@@ -1,0 +1,12 @@
+# Netlify security headers - applied to the deployed site only (not the Vite dev server).
+# The Content-Security-Policy is the primary XSS mitigation: script-src is locked to our own
+# bundle plus Google's GSI client (the only third-party script the app loads). connect-src uses
+# the https: scheme so the API works regardless of its deploy origin - tighten it to your exact
+# backend URL (e.g. https://your-api.up.railway.app) once it's stable for a stronger policy.
+# If something breaks after deploy, the browser console names the blocked directive.
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://res.cloudinary.com https://*.googleusercontent.com; font-src 'self' data:; connect-src 'self' https: https://accounts.google.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'

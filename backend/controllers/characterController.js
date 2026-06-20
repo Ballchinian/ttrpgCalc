@@ -4,6 +4,10 @@ import Character from "../models/characterModel.js";
 const CLOUDINARY_RE = /^https:\/\/res\.cloudinary\.com\//;
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+//The editable character fields, shared by create + update so the two stay in sync
+const pickCharacterFields = ({ characterName, stats, image, resistances, weaknesses, immunities, classOption }) =>
+    ({ characterName, stats, image, resistances, weaknesses, immunities, classOption });
+
 export const fetchCharacters = async (req, res) => {
     try {
         const characters = await Character.find({ playerID: req.userID }).lean();
@@ -16,11 +20,11 @@ export const fetchCharacters = async (req, res) => {
 
 export const createCharacter = async (req, res) => {
     try {
-        const { characterName, stats, image, resistances, weaknesses, immunities } = req.body;
-        if (image && !CLOUDINARY_RE.test(image)) {
+        const fields = pickCharacterFields(req.body);
+        if (fields.image && !CLOUDINARY_RE.test(fields.image)) {
             return res.status(400).json({ message: "Invalid image URL" });
         }
-        const newCharacter = new Character({ playerID: req.userID, characterName, stats, image, resistances, weaknesses, immunities });
+        const newCharacter = new Character({ playerID: req.userID, ...fields });
         const saved = await newCharacter.save();
         return res.status(201).json(saved);
     } catch (err) {
@@ -32,13 +36,13 @@ export const createCharacter = async (req, res) => {
 export const updateCharacter = async (req, res) => {
     try {
         if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid character ID" });
-        const { characterName, stats, image, resistances, weaknesses, immunities } = req.body;
-        if (image && !CLOUDINARY_RE.test(image)) {
+        const fields = pickCharacterFields(req.body);
+        if (fields.image && !CLOUDINARY_RE.test(fields.image)) {
             return res.status(400).json({ message: "Invalid image URL" });
         }
         const updatedCharacter = await Character.findOneAndUpdate(
             { _id: req.params.id, playerID: req.userID },
-            { $set: { characterName, stats, image, resistances, weaknesses, immunities } },
+            { $set: fields },
             { new: true, runValidators: true }
         );
         if (!updatedCharacter) return res.status(404).json({ message: "Character not found" });

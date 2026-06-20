@@ -2,7 +2,12 @@
 //Called after every resolved turn to feed into recapStore.
 //actionStats is keyed by targetId: { [id]: { conditionImpacts, offGuardImpacts, rollOutcome } }
 
-export function buildRecapEntry(actorName, actionName, actorEffects, targetsBefore, updatedTargets, actionStats = {}, chosenOutcomes = {}) {
+//augmentsByTarget: optional { [id]: [{ label, source, damage }] } self-buff Strike augments computed
+//on commit in choose mode (luck/avg get them from actionStats[id].actorAugmentImpacts instead).
+//capOverkill: when true, the damage counted for a target is capped at its remaining HP, so a killing
+//or post-death hit only counts the HP it could actually remove (matters in ignoreHP/theoretical modes
+//where HP goes negative; in normal mode HP already floors at 0 so the cap is a no-op).
+export function buildRecapEntry(actorName, actionName, actorEffects, targetsBefore, updatedTargets, actionStats = {}, chosenOutcomes = {}, augmentsByTarget = {}, capOverkill = false) {
     //Track which conditions were newly applied this action for the action recap
     const conditionsApplied = updatedTargets.flatMap(updated => {
         const before = targetsBefore.find(t => t.id === updated.id);
@@ -20,17 +25,19 @@ export function buildRecapEntry(actorName, actionName, actorEffects, targetsBefo
         const rollOutcome = stats.rollOutcome ?? {};
 
         //chosenOutcomes and rollOutcome.outcomeKey are both in roller's POV (target's POV for saves)
-        //Labels in OUTCOME_LABELS match roller's POV directly — no flip needed
+        //Labels in OUTCOME_LABELS match roller's POV directly - no flip needed
         const chosenKey = chosenOutcomes[updated.id];
         const displayOutcomeKey = chosenKey ?? rollOutcome.outcomeKey;
 
-        const damageTaken = Math.max(0, prevHealth - newHealth);
+        const rawDamageTaken = Math.max(0, prevHealth - newHealth);
+        //Cap counted damage at the remaining HP when the setting is on (overkill is "wasted")
+        const damageTaken = capOverkill ? Math.min(rawDamageTaken, Math.max(0, prevHealth)) : rawDamageTaken;
         const healingReceived = Math.max(0, newHealth - prevHealth);
         const wasKilled = prevHealth > 0 && newHealth <= 0 && damageTaken > 0;
 
         //luckDelta: how far above/below expected this roll landed (luck mode only).
         //Use the UNCAPPED rolled amount (rawDamage/rawHealing) so overkill/over-heal isn't misread
-        //as "unlucky" — capped HP change would understate a high roll that was partly wasted.
+        //as "unlucky" - capped HP change would understate a high roll that was partly wasted.
         const maxHealth = updated.stats?.maxHealth ?? Infinity;
         const rolledDamage = stats.rawDamage ?? damageTaken;
         const rolledHealing = stats.rawHealing ?? healingReceived;
@@ -49,6 +56,7 @@ export function buildRecapEntry(actorName, actionName, actorEffects, targetsBefo
             conditionImpacts: stats.conditionImpacts ?? [],
             offGuardImpacts: stats.offGuardImpacts ?? [],
             perConditionImpacts: stats.perConditionImpacts ?? [],
+            augmentImpacts: augmentsByTarget[updated.id] ?? stats.actorAugmentImpacts ?? [],
             outcomeKey: displayOutcomeKey,
             diceResult: rollOutcome.diceResult,
             avgOutcomeKey: rollOutcome.avgOutcomeKey,

@@ -14,11 +14,11 @@ function CharacterSkills({ skills, setSkills, setEditingSkills }) {
 
                 <h3>Skills</h3>
                 <Button
-                    variant="success"
+                    variant="secondary"
                     className="mt-4"
                     onClick={() => setEditingSkills(prev => !prev)}
                 >
-                    Hide Skills
+                    ↪ Hide Skills
                 </Button>
 
                 {/*Displays skills across more than one column*/}

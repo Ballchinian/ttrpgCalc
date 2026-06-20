@@ -13,7 +13,7 @@ export const manageOffGuardFrontend = (target, sourceCondition, action = "add") 
             : [...offGuardSources, sourceCondition];
         const newEffects = effects.some(e => e.slug === OFF_GUARD)
             ? effects
-            : [...effects, { slug: OFF_GUARD, value: 1, description: `You're distracted or otherwise unable to focus your full attention on defense. You take a –2 circumstance penalty to AC.` }];
+            : [...effects, { slug: OFF_GUARD, value: 1, description: `You're distracted or otherwise unable to focus your full attention on defense. You take a -2 circumstance penalty to AC.` }];
         return { ...target, offGuardSources: newSources, effects: newEffects };
     }
 

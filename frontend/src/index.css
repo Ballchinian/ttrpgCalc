@@ -1,3 +1,78 @@
+/* ───────────────────────────────────────────────────────────────────────────────
+   BUTTON COLOUR CONVENTION - colour = meaning for every react-bootstrap <Button> /
+   <Dropdown.Toggle> in the app. Pick the `variant` (solid or its `outline-*`) by intent:
+
+     success    (green)  -> CONFIRM: commits the user's action - saves/changes data or
+                           carries an operation through (Add/Change Weapon & Spell,
+                           New/Edit Character, Import, Use image)
+     primary    (blue)   -> OPTIONS: dropdowns and pickers that open choices
+                           (every Dropdown.Toggle, + Add Weapon/Spell picker, Choose Image)
+     danger     (red)    -> RESET: clears, removes or deletes something
+                           (Reset, Delete, Remove)
+     secondary  (grey)   -> MISC, in two sub-styles:
+                           • solid grey + ↪  when it sends you somewhere or swaps the view
+                             (Edit Previous/Add New, Edit/Hide Skills, Go to fight, Create...)
+                           • outline (no fill) when it acts in place / dismisses
+                             (Cancel, Done, Import, unselected toggles)
+
+   Keep this mapping when adding buttons so the colour always tells the user what happens.
+   ─────────────────────────────────────────────────────────────────────────────── */
+
+/* Bootstrap 5 defaults --bs-body-color to near-black and most BS5 components read this
+   variable directly, so setting it here (not just on body) restores the app's original
+   grey-white text everywhere under the dark theme. */
+:root {
+  --bs-body-color: #a6c0b7;
+  --bs-body-color-rgb: 166, 192, 183;
+  --bs-body-bg: #051c3d;
+  /* Bootstrap's light :root sets these muted-text vars to near-black (rgba(33,37,41,...)), so every
+     .text-muted / .text-body-secondary (e.g. the "Effects by Save Result" hint in Add Spell)
+     renders as unreadable black on the navy theme. Re-derive them from the body colour. */
+  --bs-secondary-color: rgba(166, 192, 183, 0.75);
+  --bs-secondary-color-rgb: 166, 192, 183;
+  --bs-tertiary-color: rgba(166, 192, 183, 0.5);
+  --bs-tertiary-color-rgb: 166, 192, 183;
+  /* Bootstrap 5's success green (#198754) reads muted/grey on the navy theme. Restore the brighter
+     BS4-style green the app used before the upgrade. Drives bg-success (HP bars), badges, text-success. */
+  --bs-success: #28a745;
+  --bs-success-rgb: 40, 167, 69;
+}
+
+/* App-owned semantic colour tokens. These alias the Bootstrap theme vars above (or set a
+   literal) so inline styles in JSX and the CSS share one source of truth instead of each
+   re-typing the hex. Consume from an inline style with e.g. color: "var(--app-text)". */
+:root {
+  --app-success: var(--bs-success);   /* #28a745  positive / confirm (also used on hover)  */
+  --app-text: var(--bs-body-color);   /* #a6c0b7  default grey-green body text              */
+  --app-panel: #1e1e2e;               /* dark popover / modal / notification surface        */
+  --app-danger: #dc3545;              /* bad outcome: failed check or negative delta        */
+  --app-alert: #e05555;               /* brighter live-alert red: load errors, off-guard    */
+}
+
+/* Bootstrap 5.3 cards default to --bs-card-bg: var(--bs-body-bg) and a translucent-black border, so
+   on this navy theme a card is the same colour as the page with no visible edge - it disappears. The
+   app previously relied on a leaked global `.card { background-color:#091629 }` (now scoped to the
+   homepage) for a distinct surface. Restore a distinct dark card surface + a subtle light border
+   app-wide so cards (battle-sim character cards, calculator stat cards, action panel, ...) read
+   clearly. The homepage cards set their own background-color directly, so they're unaffected. */
+.card {
+  --bs-card-bg: #091629;
+  --bs-card-border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* btn-success bakes its colours as literal hex (not var(--bs-success)), so the brighter green has to
+   be reapplied to the button-scoped vars directly. */
+.btn-success {
+  --bs-btn-bg: #28a745;
+  --bs-btn-border-color: #28a745;
+  --bs-btn-hover-bg: #218838;
+  --bs-btn-hover-border-color: #1e7e34;
+  --bs-btn-active-bg: #1e7e34;
+  --bs-btn-active-border-color: #1c7430;
+  --bs-btn-disabled-bg: #28a745;
+  --bs-btn-disabled-border-color: #28a745;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -22,4 +97,33 @@ a {
 a:hover {
   color: #f0ad4e;
   text-decoration: none;
+}
+
+/* Dark form fields app-wide - the default Bootstrap form-control renders dark text, which is
+   unreadable on the navy theme (login, register, reset, bonus entry, builders, ...). */
+.form-control,
+.form-select {
+  background-color: #222;
+  color: #fff;
+  border-color: #555;
+}
+.form-control:focus,
+.form-select:focus {
+  background-color: #222;
+  color: #fff;
+  border-color: #8a8a8a;
+  box-shadow: none;
+}
+.form-control::placeholder {
+  color: #8a8a8a;
+}
+
+/* Bootstrap 5.3 tooltips default to --bs-tooltip-color: var(--bs-body-bg) (our navy) painted on a
+   near-black --bs-emphasis-color background, i.e. dark text on a dark fill - unreadable. Force the
+   same legible dark-panel/white-text styling the hover popovers use, app-wide (every OverlayTrigger
+   tooltip: character-design stat hints, builders, combat log, ...). */
+.tooltip {
+  --bs-tooltip-bg: #1e1e2e;
+  --bs-tooltip-color: #ffffff;
+  --bs-tooltip-opacity: 1;
 }

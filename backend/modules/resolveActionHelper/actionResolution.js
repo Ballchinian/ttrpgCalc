@@ -1,5 +1,5 @@
 import { effectModules } from "../effects/effectModules/effectModules.js";
-import { sumOfDice, avgOfDice } from "../../utility/diceUtils.js";
+import { resolveDiceAmount } from "../../utility/diceUtils.js";
 
 //PF2e priority: immunity beats resistance, weakness stacks on top of resistance
 export function applyDamageModifiers(rawDamage, damageType, char) {
@@ -8,8 +8,7 @@ export function applyDamageModifiers(rawDamage, damageType, char) {
     if ((char.immunities ?? []).some(i => i.toLowerCase() === type)) return 0;
     const res = (char.resistances ?? []).find(r => r.damageType.toLowerCase() === type);
     const wk = (char.weaknesses ?? []).find(w => w.damageType.toLowerCase() === type);
-    //PF2e applies weakness then resistance, clamping the total at 0 only at the end —
-    //so heavy resistance can fully cancel a weakened hit (clamping mid-way would over-count).
+    //PF2e applies weakness then resistance, clamping the total at 0 only at the end
     let damage = rawDamage;
     if (wk) damage += wk.value;
     if (res) damage -= res.value;
@@ -37,7 +36,7 @@ const CONDITION_COVERS = {
     grabbed: ["immobilized"],
 };
 
-//True if a more-severe condition already makes `name` redundant
+//True if a more severe condition already makes `name` redundant
 function isCoveredByHigher(name, effects) {
     return Object.entries(CONDITION_COVERS).some(
         ([superior, covered]) => covered.includes(name) && effects.some(e => e.slug === superior)
@@ -47,11 +46,25 @@ function isCoveredByHigher(name, effects) {
 //Names of conditions superseded (and removed) when `name` is applied
 const supersededBy = name => CONDITION_COVERS[name] ?? [];
 
+//Conditions whose application can be blocked by a trait immunity (e.g. immunity to "fear" blocks
+//frightened). A creature immune to the condition's own slug is always blocked too.
+const CONDITION_TRAITS = {
+    frightened: ["fear", "emotion", "mental"],
+    fleeing: ["fear", "emotion", "mental"],
+    confused: ["emotion", "mental"],
+    stupefied: ["mental"],
+};
+
+//True if the creature is immune to a condition (by the condition's slug or a relevant trait)
+function isImmuneToCondition(char, slug) {
+    const imm = (char.immunities ?? []).map(i => String(i).toLowerCase());
+    if (imm.includes(slug)) return true;
+    return (CONDITION_TRAITS[slug] ?? []).some(t => imm.includes(t));
+}
+
 export const damageResolution = (characters, actionInfo) => {
     return characters.map(character => {
-        const raw = actionInfo.avgMultiplier !== undefined
-            ? avgOfDice(actionInfo.number, actionInfo.avgMultiplier)
-            : sumOfDice(actionInfo.number, actionInfo.multiplier);
+        const raw = resolveDiceAmount(actionInfo.number, actionInfo);
         const damage = applyDamageModifiers(raw, actionInfo.damageType, character);
         return { ...character, stats: { ...character.stats, currentHealth: Math.max(0, character.stats.currentHealth - damage) } };
     });
@@ -59,9 +72,7 @@ export const damageResolution = (characters, actionInfo) => {
 
 export const healingResolution = (characters, actionInfo) => {
     return characters.map(character => {
-        const healing = actionInfo.avgMultiplier !== undefined
-            ? avgOfDice(actionInfo.number, actionInfo.avgMultiplier)
-            : sumOfDice(actionInfo.number, actionInfo.multiplier);
+        const healing = resolveDiceAmount(actionInfo.number, actionInfo);
         const maxHealth = character.stats.maxHealth ?? character.stats.attributes?.hp ?? 0;
         return { ...character, stats: { ...character.stats, currentHealth: Math.min(maxHealth, Math.max(0, character.stats.currentHealth + healing)) } };
     });
@@ -85,6 +96,8 @@ export const conditionResolution = (characters, actionInfo) => {
 
         let effects = character.effects ?? [];
         if (actionInfo.type === "addCondition") {
+            //Skip if the creature is immune to this condition (by slug or a trait like fear/mental)
+            if (isImmuneToCondition(character, actionName)) return character;
             //Skip if a more severe condition already covers this one
             if (isCoveredByHigher(actionName, effects)) return character;
             //Remove less-severe conditions that this one supersedes

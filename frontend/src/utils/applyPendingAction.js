@@ -5,12 +5,20 @@ import { manageOffGuardFrontend } from '../components/utility/manageOffGuard';
 import { buildRecapEntry } from './buildRecapEntry';
 import { isCoveredByHigher, supersededBy } from '../data/conditionHierarchy';
 import { queueCritSpecPrompts } from './critSpecPrompts';
+import { applyDamageToPools } from './hpPools';
 
-//Stamps actor context onto an endOfNextTurn duration that hasn't been hydrated yet
+//Stamps round/actor context onto turn-relative durations the backend can't fill in
 function hydrateDuration(duration, recapContext) {
-    if (duration?.type !== "endOfNextTurn" || duration.actorId) return duration ?? { type: "manual" };
-    if (!recapContext) return duration;
-    return { type: "endOfNextTurn", actorId: recapContext.actorId, actorName: recapContext.actorName, appliedRound: recapContext.round };
+    //endOfNextTurn tracks the applying actor; startOfTargetTurn only needs the round it was applied
+    if (duration?.type === "endOfNextTurn" && !duration.actorId) {
+        return recapContext
+            ? { type: "endOfNextTurn", actorId: recapContext.actorId, actorName: recapContext.actorName, appliedRound: recapContext.round }
+            : duration;
+    }
+    if (duration?.type === "startOfTargetTurn" && duration.appliedRound == null) {
+        return recapContext ? { type: "startOfTargetTurn", appliedRound: recapContext.round } : duration;
+    }
+    return duration ?? { type: "manual" };
 }
 
 //Hydrates all endOfNextTurn conditions in an effects array
@@ -18,12 +26,23 @@ function hydrateEffects(effects, recapContext) {
     return effects.map(e => e.duration ? { ...e, duration: hydrateDuration(e.duration, recapContext) } : e);
 }
 
+//Spends a deferred resource (e.g. panache via a Finisher) on commit by removing it from the actor.
+//Deferring to commit means cancelling a choose-mode outcome pick never wastes the resource.
+function applyConsumeOnCommit(consume) {
+    if (!consume?.slug) return;
+    const { updateCharacterInList } = useBattleStore.getState();
+    updateCharacterInList(consume.side, consume.id, c => ({
+        ...c, effects: (c.effects ?? []).filter(e => e.slug !== consume.slug),
+    }));
+}
+
 //Applies the current pendingAction to characters and recap.
 //applyKey: outcome key string for choose mode, null for auto modes (luck/avg)
 //targetId: specific target to resolve in choose mode, each target picks independently
 export function applyPendingAction(applyKey = null, targetId = null) {
-    const { pendingAction, updateCharacterInList, clearPendingAction, setPendingAction, log, setLog } = useBattleStore.getState();
+    const { pendingAction, updateCharacterInList, clearPendingAction, setPendingAction, log, setLog, settings } = useBattleStore.getState();
     const { addEntry } = useRecapStore.getState();
+    const capOverkill = settings?.capOverkill ?? false;
 
     if (!pendingAction) return;
 
@@ -58,7 +77,7 @@ export function applyPendingAction(applyKey = null, targetId = null) {
         });
 
         //When ignoreHP=true, backend HP is capped by floor/ceiling but we want uncapped totals in the recap.
-        //Let theoreticalHP go below 0 or above maxHealth — buildRecapEntry's Math.max(0, ...) handles display clamping.
+        //Let theoreticalHP go below 0 or above maxHealth - buildRecapEntry's Math.max(0, ...) handles display clamping.
         const recapTargets = pendingAction.ignoreHP
             ? pendingAction.updatedTargets.map(updated => {
                 const before = recapContext.targetsBefore.find(t => t.id === updated.id);
@@ -76,8 +95,12 @@ export function applyPendingAction(applyKey = null, targetId = null) {
             recapContext.targetsBefore,
             recapTargets,
             recapContext.actionStats ?? {},
+            {},
+            {},
+            capOverkill,
         );
         addEntry(recapContext.round, entry);
+        applyConsumeOnCommit(pendingAction.consume);
         clearPendingAction();
 
     } else {
@@ -90,6 +113,13 @@ export function applyPendingAction(applyKey = null, targetId = null) {
             console.warn("applyPendingAction: unknown applyKey", applyKey);
             return;
         }
+
+        //Self-buff Strike augments (Finisher/Precise Strike, etc.) for this chosen outcome, so the recap
+        //can attribute the bonus damage. Tagged _augment by the backend strike-rider injectors.
+        const augImpacts = effects
+            .filter(e => e.type === "damage" && e._augment && (e.resolvedValue ?? 0) > 0)
+            .map(e => ({ label: e._augment.label, source: e._augment.source, damage: Math.round(e.resolvedValue) }));
+        const updatedChosenAugments = { ...(pendingAction.chosenAugments ?? {}), [targetId]: augImpacts };
 
         //When ignoreHP is on, HP won't change in the store, but we still want the recap to show damage.
         //Compute what HP would be and carry it forward in theoreticalHPs so buildRecapEntry can use it.
@@ -115,7 +145,7 @@ export function applyPendingAction(applyKey = null, targetId = null) {
             return {
                 ...line,
                 isChoosePending: false,
-                body: `${resolvedPrefix}${chosen?.summary ?? "—"}`,
+                body: `${resolvedPrefix}${chosen?.summary ?? "-"}`,
                 ...(resolvedParts?.length > 0 && { bodyParts: [{ type: "text", text: resolvedPrefix }, ...resolvedParts] }),
             };
         });
@@ -126,7 +156,7 @@ export function applyPendingAction(applyKey = null, targetId = null) {
 
         if (remaining.length > 0) {
             //Other targets still need choices, keep pendingAction alive with remaining list + accumulated theoreticalHPs
-            setPendingAction({ ...pendingAction, perTarget: remaining, chosenOutcomes: updatedChosenOutcomes, theoreticalHPs });
+            setPendingAction({ ...pendingAction, perTarget: remaining, chosenOutcomes: updatedChosenOutcomes, chosenAugments: updatedChosenAugments, theoreticalHPs });
             return;
         }
 
@@ -158,8 +188,11 @@ export function applyPendingAction(applyKey = null, targetId = null) {
             updatedTargets,
             recapContext.actionStats ?? {},
             updatedChosenOutcomes,
+            updatedChosenAugments,
+            capOverkill,
         );
         addEntry(recapContext.round, entry);
+        applyConsumeOnCommit(pendingAction.consume);
         clearPendingAction();
 
         //Queue crit spec prompts (saves, axe adjacent damage) for targets the user marked criticalSuccess
@@ -207,7 +240,8 @@ export function applyEffectsToChar(char, effects, recapContext, ignoreHP = false
             //Persistent damage has no immediate HP loss (backend sets resolvedValue:0; condition handles it)
             if (effect.category === "persistent" || effect.resolvedValue === 0) return;
             if (effect.resolvedValue !== undefined) {
-                updated = { ...updated, stats: { ...updated.stats, currentHealth: Math.max(0, updated.stats.currentHealth - effect.resolvedValue) } };
+                //Temp HP absorbs before real HP
+                updated = { ...updated, stats: { ...updated.stats, ...applyDamageToPools(updated.stats, effect.resolvedValue) } };
             } else {
                 console.warn("applyEffectsToChar: damage effect missing resolvedValue", effect);
             }
@@ -222,6 +256,10 @@ export function applyEffectsToChar(char, effects, recapContext, ignoreHP = false
                 console.warn("applyEffectsToChar: healing effect missing resolvedValue", effect);
             }
 
+        } else if (effect.type === "tempHP") {
+            //Temp HP (e.g. Rage) doesn't stack - keep the higher pool
+            updated = { ...updated, stats: { ...updated.stats, tempHP: Math.max(updated.stats.tempHP ?? 0, Math.max(0, effect.value ?? 0)) } };
+
         } else if (effect.type === "addCondition") {
             const condName = effect.condition.toLowerCase();
             //Persistent damage conditions: immunity blocks application; damageType stored for endRound
@@ -231,7 +269,7 @@ export function applyEffectsToChar(char, effects, recapContext, ignoreHP = false
                 const duration = hydrateDuration(effect.duration, recapContext);
                 const existing = updated.effects.find(e => e.slug === condName);
                 if (existing) {
-                    //PF2e: same damage type doesn't stack — keep the higher amount
+                    //PF2e: same damage type doesn't stack - keep the higher amount
                     const newValue = Math.max(existing.value, effect.adjustBy ?? 1);
                     if (newValue > existing.value) {
                         updated.effects = updated.effects.map(e =>

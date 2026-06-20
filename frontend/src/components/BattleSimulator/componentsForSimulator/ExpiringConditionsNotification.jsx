@@ -6,7 +6,7 @@ const containerStyle = {
     left: "50%",
     transform: "translateX(-50%)",
     zIndex: 1050,
-    backgroundColor: "#1e1e2e",
+    backgroundColor: "var(--app-panel)",
     border: "1px solid rgba(255,200,50,0.5)",
     borderRadius: "8px",
     padding: "12px 16px",

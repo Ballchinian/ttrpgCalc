@@ -1,8 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../auth';
 import { Navbar as BsNavbar, Container, Nav } from 'react-bootstrap';
-import { useBattleStore } from '../../store/battleStore';
-import { useRecapStore } from '../../store/recapStore';
 
 function Navbar({ onLogout }) {
     const navigate = useNavigate();
@@ -49,15 +47,22 @@ function Navbar({ onLogout }) {
                         Weapon/Spell Builder
                     </Nav.Link>
 
-                    <Nav.Link 
-                        onClick={() => navigate("/battle-calculator")} 
+                    <Nav.Link
+                        onClick={() => navigate("/battle-calculator")}
                         style={linkStyle}
                     >
                         Calculator
                     </Nav.Link>
 
-                    <Nav.Link 
-                        onClick={() => navigate("/character-selection")} 
+                    <Nav.Link
+                        onClick={() => navigate("/saved-battles")}
+                        style={linkStyle}
+                    >
+                        Battles
+                    </Nav.Link>
+
+                    <Nav.Link
+                        onClick={() => navigate("/character-selection")}
                         style={linkStyle}
                     >
                         Character Select
@@ -65,8 +70,8 @@ function Navbar({ onLogout }) {
                     
                     <Nav.Link className="text-warning"
                         onClick={async () => {
-                            useBattleStore.getState().resetBattle();
-                            useRecapStore.getState().clearRecap();
+                            //Keep the battle on logout - it's restored when this same user logs back in
+                            //(a different user logging in clears it; see App.handleLogin / claimForUser)
                             await logout();
                             onLogout?.();
                             navigate("/");

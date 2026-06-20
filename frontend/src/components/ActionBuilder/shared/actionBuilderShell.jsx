@@ -5,7 +5,7 @@ function ActionBuilderShell({ title, choices, nameValue, onNameChange, onSelect,
     const nameError = errors.name || errors.duplicate;
 
     return (
-        <div className="mt-5" style={{ display: "flex", justifyContent: "center", maxWidth: "600px", margin: "0 auto" }}>
+        <div className="action-builder mt-5" style={{ display: "flex", justifyContent: "center", maxWidth: "320px", margin: "0 auto" }}>
             {/* Add */}
             <Card className="flex-column" style={{ display: divVisibility ? "none" : "flex" }}>
                 <h2 className="text-center">Add {title}</h2>
@@ -25,14 +25,17 @@ function ActionBuilderShell({ title, choices, nameValue, onNameChange, onSelect,
                     </Form.Group>
                     {children}
                     {saveError && <div className="text-danger mb-2" style={{ fontSize: "13px" }}>{saveError}</div>}
-                    <Button as={Col} className="mb-3" onClick={onSave}>Add {title}</Button>
-                    <Button as={Col} onClick={onSwap}>Edit Previous {title}s</Button>
+                    {/* Stacked, full-width: primary save on top, the UI-swap below with ↪ to hint it switches view */}
+                    <div className="d-grid gap-2">
+                        <Button variant="success" onClick={onSave}>✔️ Add {title}</Button>
+                        <Button variant="secondary" onClick={onSwap}>↪ Edit Previous {title}s</Button>
+                    </div>
                 </Form>
             </Card>
 
             {/* Edit */}
             <Card className="flex-column" style={{ display: divVisibility ? "flex" : "none" }}>
-                <h2 className="text-center">Change {title}</h2>
+                <h2 className="text-center mb-4">Change {title}</h2>
                 <Form>
                     <ButtonGroup className="d-flex align-items-end mb-3">
                         <Form.Control
@@ -54,15 +57,18 @@ function ActionBuilderShell({ title, choices, nameValue, onNameChange, onSelect,
                     </ButtonGroup>
                     {children}
                     {saveError && <div className="text-danger mb-2" style={{ fontSize: "13px" }}>{saveError}</div>}
-                    <div className="d-flex gap-2">
-                        <Button as={Col} className="flex-grow-1" onClick={onSave}>Change {title}</Button>
-                        {selectedID && (
-                            <Button variant="danger" onClick={() => onDelete(selectedID)}>
-                                <FaTrashAlt /> Delete
-                            </Button>
-                        )}
+                    <div className="d-grid gap-2">
+                        <div className="d-flex gap-2">
+                            <Button variant="success" className="flex-grow-1" onClick={onSave}>✔️ Change {title}</Button>
+                            {selectedID && (
+                                <Button variant="danger" onClick={() => onDelete(selectedID)}>
+                                    <FaTrashAlt /> Delete
+                                </Button>
+                            )}
+                        </div>
+                        {/* Full-width swap back to the Add view, with ↪ to mirror the Add card */}
+                        <Button variant="secondary" onClick={onSwap}>↪ Add New {title}s</Button>
                     </div>
-                    <Button as={Col} className="mt-3" onClick={onSwap}>Add New {title}s</Button>
                 </Form>
             </Card>
         </div>

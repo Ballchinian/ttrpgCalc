@@ -1,6 +1,6 @@
 import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { refreshAccessToken } from './auth';
+import { refreshAccessToken, getUserID } from './auth';
 import { useBattleStore } from './store/battleStore';
 import { useRecapStore } from './store/recapStore';
 import ErrorBoundary from './components/utility/ErrorBoundary.jsx';
@@ -16,6 +16,7 @@ import CharacterSelection from './components/CharacterSelection/CharacterSelecti
 import CharacterDesign from './components/CharacterDesign/CharacterDesign';
 import BattleCalculator from './components/BattleCalculator/BattleCalculator';
 import BattleManager from './components/BattleSimulator/BattleManager';
+import SavedBattles from './components/SavedBattles/SavedBattles';
 
 //Redirects unauthenticated users to login instead of showing a broken UI
 function ProtectedRoute({ authed, children }) {
@@ -39,8 +40,9 @@ function App() {
     if (!ready) return null;
 
     const handleLogin = () => {
-        useBattleStore.getState().resetBattle();
-        useRecapStore.getState().clearRecap();
+        //Keep the same user's battle across login; only clear it (and the recap) if a DIFFERENT user logs in
+        const wasReset = useBattleStore.getState().claimForUser(getUserID());
+        if (wasReset) useRecapStore.getState().clearRecap();
         setAuthed(true);
     };
     const handleLogout = () => setAuthed(false);
@@ -62,6 +64,7 @@ function App() {
             <Route path="/character-selection/character-design/:characterID" element={wrap(<CharacterDesign />)} />
             <Route path="/battle-calculator" element={wrap(<BattleCalculator />)} />
             <Route path="/battle-calculator/battle-simulator" element={wrap(<BattleManager />)} />
+            <Route path="/saved-battles" element={wrap(<SavedBattles />)} />
             <Route path="*" element={<div className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: "60vh" }}><h2>404: Page not found</h2></div>} />
         </Routes>
         </ErrorBoundary>

@@ -8,13 +8,19 @@ import { queueCritSpecPrompts } from '../utils/critSpecPrompts';
 //Encapsulates the full async turn-resolution pipeline.
 //Uses getState() so it always reads the latest values, not stale closure values.
 //Plain function (not a hook): no React hooks used internally.
-export async function resolveTurn() {
+//Confirm-time attack choices from the Attack Options modal:
+//  strikeRider: optional { optionId } for a class strike rider (e.g. Swashbuckler Precise Strike)
+//  versatileDamageType: optional damage type chosen for a versatile weapon
+//  consume: optional { slug } resource the chosen option spends (e.g. panache via a Finisher); spent
+//           on commit (not now) so cancelling a choose-mode outcome pick never wastes it.
+//Both are validated server-side against the actor's class option / weapon.
+export async function resolveTurn({ strikeRider = null, versatileDamageType = null, consume = null } = {}) {
     const {
         target, action, settings, round, parties,
         updateCharacterInList, setLog, setError,
         canSpendActions, spendActions, getCharByRef, setPendingAction,
     } = useBattleStore.getState();
-    const { allItems, spellData } = useGameDataStore.getState();
+    const { allItems, spellData, featureActions } = useGameDataStore.getState();
 
     setError("");
 
@@ -31,11 +37,16 @@ export async function resolveTurn() {
     if (!targetCharacters.length && action.targetType !== "self") { setError("Please select target characters"); return; }
     if (!action.selected)                                         { setError("No action selected");              return; }
 
-    //Action economy: compute cost here for the gate check; actual spend happens after API confirms
+    //Action economy: compute cost here for the gate check; actual spend happens after API confirms.
+    //Feature actions can declare actionCost "reaction" (grant-as-action hook) - a reaction doesn't
+    //consume one of the 3 actions, so it costs 0 here (a dedicated reaction tracker is future work).
+    const featureCost = featureActions?.[action.selected]?.actionCost;
     const actionCost = !settings.autoActions
-        ? (allItems.weapons?.find(w => w.name === action.selected)?.actionCost ??
-           spellData.find(s => s.name === action.selected)?.actionCost ??
-           (action.selectedType === "global_action" || !action.selectedType ? 1 : 0))
+        ? (featureCost === "reaction" ? 0
+           : (allItems.weapons?.find(w => w.name === action.selected)?.actionCost ??
+              spellData.find(s => s.name === action.selected)?.actionCost ??
+              (typeof featureCost === "number" ? featureCost
+               : (action.selectedType === "global_action" || !action.selectedType ? 1 : 0))))
         : 0;
 
     if (!settings.autoActions && !canSpendActions(target.activeActor, actionCost)) {
@@ -66,13 +77,19 @@ export async function resolveTurn() {
     if (!actionData) { actionData = action.selected; }
     if (!actionType) { actionType = "global_action"; }
 
-    const critSpecGroup = action.critSpec && actionType === "weapon"
+    //Crit spec is a per-character toggle now (activeActor.critSpec), remembered across actions/turns.
+    const critSpecGroup = activeActor?.critSpec && actionType === "weapon"
         ? (allItems.weapons?.find(w => w.name === action.selected)?.group ?? null)
         : null;
-    //Weapon damage dice drive the axe crit spec (it deals the rolled weapon dice to an adjacent creature)
-    const critSpecWeaponDice = critSpecGroup
-        ? (actionData?.outcomes?.success?.effects?.find(e => e.type === "damage")?.number ?? null)
-        : null;
+    //Weapon damage dice drive the axe crit spec (it deals the rolled weapon dice to an adjacent creature).
+    //The striking rune's extra dice are stored separately on the weapon, so fold them in here too.
+    const critSpecWeaponDice = (() => {
+        if (!critSpecGroup) return null;
+        const base = actionData?.outcomes?.success?.effects?.find(e => e.type === "damage")?.number ?? null;
+        if (!base) return null;
+        const striking = actionData?.striking ?? 0;
+        return striking ? { ...base, numRolled: (base.numRolled ?? 0) + striking } : base;
+    })();
 
     const battleSession = (() => {
         try { return JSON.parse(localStorage.getItem("battleSession") || "{}"); }
@@ -108,6 +125,8 @@ export async function resolveTurn() {
                 offensiveBonuses,
                 characterDefensiveBonuses,
                 critSpecGroup,
+                strikeRider,
+                versatileDamageType,
             }),
         });
 
@@ -156,12 +175,15 @@ export async function resolveTurn() {
             actionStats: data.actionStats ?? {},
         };
 
+        //Resource the chosen option spends, applied on commit (see applyPendingAction)
+        const consumeOnCommit = consume?.slug ? { side: activeActor.side, id: activeActor.id, slug: consume.slug } : null;
+
         //All modes route through pendingAction: auto modes apply immediately, choose waits for user
         if (data.pendingOutcomes) {
             //Carry crit spec context so applyPendingAction can queue prompts once outcomes are chosen
-            setPendingAction({ mode: "choose", perTarget: data.pendingOutcomes, recapContext, chosenOutcomes: {}, ignoreHP: settings.ignoreHP, critSpecGroup, critSpecWeaponDice });
+            setPendingAction({ mode: "choose", perTarget: data.pendingOutcomes, recapContext, chosenOutcomes: {}, ignoreHP: settings.ignoreHP, critSpecGroup, critSpecWeaponDice, consume: consumeOnCommit });
         } else {
-            setPendingAction({ mode: "auto", updatedTargets: data.updatedTargetCharacters, ignoreHP: settings.ignoreHP, recapContext });
+            setPendingAction({ mode: "auto", updatedTargets: data.updatedTargetCharacters, ignoreHP: settings.ignoreHP, recapContext, consume: consumeOnCommit });
             applyPendingAction();
 
             //Queue any crit spec prompts (saves, axe adjacent damage) for critically-hit targets.

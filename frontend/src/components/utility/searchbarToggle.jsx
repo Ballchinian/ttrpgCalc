@@ -28,13 +28,17 @@ function SearchbarToggle({
                     setQuery("");
                     onBlur();
                 }}
+                /* Dark to match the app theme (every usage sits on a dark/navy surface) */
+                style={{ background: "#222", color: "white", border: "1px solid #555" }}
             />
 
             {query && (
                 <div
                     style={{
-                        background: "white",
-                        color: "black",
+                        background: "var(--app-panel)",
+                        color: "#dfe6e2",
+                        border: "1px solid rgba(255,255,255,0.15)",
+                        borderRadius: "4px",
                         marginTop: "2px",
                         maxHeight: "120px",
                         overflowY: "auto",
@@ -52,7 +56,10 @@ function SearchbarToggle({
                                         display: "flex",
                                         alignItems: "center",
                                         gap: "8px",
+                                        cursor: "pointer",
                                     }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+                                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                                     onMouseDown={(e) => {
                                         e.preventDefault(); //prevent onBlur from firing before click registers
                                         onSelect(item);
@@ -75,7 +82,7 @@ function SearchbarToggle({
                             );
                         })
                     ) : (
-                        <div style={{ padding: "4px 8px" }}>No matches</div>
+                        <div style={{ padding: "4px 8px", color: "#8aa39a" }}>No matches</div>
                     )}
                 </div>
             )}

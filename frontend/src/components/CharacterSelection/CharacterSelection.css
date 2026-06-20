@@ -1,12 +1,12 @@
-
-
-Button {
-    width:auto;
-    margin:0;
+/* Character carousel cards. The card sizes itself to its contents (header + 160x200 portrait +
+   Delete button) rather than a fixed height, so the chosen image drives how tall the card is. */
+.character-card {
+    margin: 0;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-
-.card {
-    margin:0
-    
+.character-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
 }

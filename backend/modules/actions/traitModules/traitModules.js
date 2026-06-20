@@ -43,6 +43,29 @@ export const traitModules = {
         effects: { reach: true },
         resolve: (profile) => { profile.reach = true; },
     },
+    //Marker traits used by condition interactions (e.g. grabbed forces a flat check on manipulate actions).
+    //No effect on the action's own profile; the interaction lives on the condition (see classFeatures-style
+    //traitFlatCheck on effect modules).
+    manipulate: {
+        label: "Manipulate",
+        render: null,
+        effects: {},
+        resolve: () => {},
+    },
+    concentrate: {
+        label: "Concentrate",
+        render: null,
+        effects: {},
+        resolve: () => {},
+    },
+    //Marker traits (no profile effect) - let condition/effect interactions match on actions and surface
+    //in the trait editors. The frontend trait catalog (traitCatalog.js) adds many more inert names.
+    barbarian: { label: "Barbarian", render: null, effects: {}, resolve: () => {} },
+    emotion:   { label: "Emotion",   render: null, effects: {}, resolve: () => {} },
+    mental:    { label: "Mental",    render: null, effects: {}, resolve: () => {} },
+    rage:      { label: "Rage",      render: null, effects: {}, resolve: () => {} },
+    stance:    { label: "Stance",    render: null, effects: {}, resolve: () => {} },
+    flourish:  { label: "Flourish",  render: null, effects: {}, resolve: () => {} },
     versatile: {
         label: "Versatile",
         render: { fields: [
@@ -68,6 +91,39 @@ export const traitModules = {
         effects: {},
         //profileDefaults.critThreshold = 20 is the authoritative fallback: only override when a value was stored
         resolve: (profile, data) => { if (data?.threshold != null) profile.critThreshold = data.threshold; },
+    },
+    //Die-valued weapon traits. PF2e writes these as a die size (e.g. "deadly d8"); the editor must prompt
+    //for that die. They're inert here (no resolve effect - crit-damage maths isn't modelled yet) but carry
+    //their die in trait.data so it's stored and shown, and so future mechanics can read it.
+    deadly: {
+        label: "Deadly",
+        render: { fields: [{ key: "die", type: "select", label: "Deadly Die", options: ["d6", "d8", "d10", "d12"] }] },
+        effects: {},
+        resolve: () => {},
+    },
+    fatal: {
+        label: "Fatal",
+        render: { fields: [{ key: "die", type: "select", label: "Fatal Die", options: ["d8", "d10", "d12"] }] },
+        effects: {},
+        resolve: () => {},
+    },
+    "fatal-aim": {
+        label: "Fatal Aim",
+        render: { fields: [{ key: "die", type: "select", label: "Fatal Die", options: ["d8", "d10", "d12"] }] },
+        effects: {},
+        resolve: () => {},
+    },
+    "two-hand": {
+        label: "Two-Hand",
+        render: { fields: [{ key: "die", type: "select", label: "Two-Handed Die", options: ["d6", "d8", "d10", "d12"] }] },
+        effects: {},
+        resolve: () => {},
+    },
+    jousting: {
+        label: "Jousting",
+        render: { fields: [{ key: "die", type: "select", label: "Jousting Die", options: ["d6", "d8"] }] },
+        effects: {},
+        resolve: () => {},
     },
 };
 

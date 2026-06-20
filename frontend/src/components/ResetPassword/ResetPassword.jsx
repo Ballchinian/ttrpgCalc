@@ -41,7 +41,9 @@ function ResetPassword() {
 
     return (
         <div className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '80vh', maxWidth: '400px', margin: '0 auto' }}>
-            <Card>
+            {/* padding set explicitly: content sits directly in <Card> (no Card.Body), which used to
+                get spacing from the now-scoped global `.card { padding:20px }` */}
+            <Card style={{ padding: "20px", width: "100%" }}>
                 <h2>Reset Your Password</h2>
                 {message && <p style={{ color: 'green' }}>{message}</p>}
 
@@ -76,7 +78,7 @@ function ResetPassword() {
                                 <Form.Control.Feedback type="invalid">{errors.confirmPassword}</Form.Control.Feedback>
                             </Form.Group>
 
-                            <Button type="submit" disabled={isSubmitting}>Reset Password</Button>
+                            <Button type="submit" variant="success" disabled={isSubmitting}>Reset Password</Button>
                         </Form>
                     )}
                 </Formik>

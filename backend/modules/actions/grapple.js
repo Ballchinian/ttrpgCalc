@@ -22,14 +22,14 @@ export default {
             ]
         },
         failure: {
-            text: "You fail to grab your target. If you already had them grabbed or restrained, those conditions end.",
+            text: "You fail to grab your target. If you already had the target grabbed or restrained using a Grapple, those conditions on the target end.",
             effects: [
                 { type: "removeCondition", condition: "grabbed", target: "targetCharacters" },
                 { type: "removeCondition", condition: "restrained", target: "targetCharacters" }
             ]
         },
         criticalFailure: {
-            text: "Your target breaks free. You fall prone.",
+            text: "If you already had the target grabbed or restrained, it breaks free. Your target can either grab you, as if it succeeded at using the Grapple action against you, or force you to fall and land prone.",
             effects: [
                 { type: "removeCondition", condition: "grabbed", target: "targetCharacters" },
                 { type: "removeCondition", condition: "restrained", target: "targetCharacters" },
@@ -37,5 +37,5 @@ export default {
             ]
         }
     },
-    description: "You attempt to grab a creature or object with your free hand. Attempt an Athletics check against the target's Fortitude DC. You can Grapple a target you already have grabbed or restrained without having a hand free."
+    description: "Attempt an Athletics check against the target's Fortitude DC. You can Grapple a target you already have grabbed or restrained without having a hand free."
 };

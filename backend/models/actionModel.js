@@ -33,8 +33,10 @@ const traitSchema = new mongoose.Schema(
 
 const durationSchema = new mongoose.Schema(
     {
-        type: { type: String, enum: ["manual", "rounds", "endOfRound", "decrement", "endOfNextTurn"], default: "manual" },
+        type: { type: String, enum: ["manual", "rounds", "endOfRound", "decrement", "endOfNextTurn", "startOfTargetTurn", "currentTurn", "flatCheck"], default: "manual" },
         remaining: { type: Number },
+        //Custom flat-check recovery DC (persistent damage / "until DC X" conditions). Defaults to 15.
+        dc: { type: Number, min: 2, max: 60 },
     },
     { _id: false }
 );
@@ -52,6 +54,8 @@ const effectSchema = new mongoose.Schema(
         damageType: { type: String },
         //Damage instance category, mirroring Foundry (only "persistent" is currently modelled)
         category: { type: String, enum: ["persistent", "splash", "precision"] },
+        //Persistent damage recovery flat-check DC (default 15 when unset)
+        recoveryDC: { type: Number, min: 2, max: 60 },
         condition: {
             type: String,
             validate: {
@@ -92,8 +96,9 @@ const checkSchema = new mongoose.Schema(
         },
         actorStat: {
             type: String,
+            //spellAttack = spell attack roll (resolved as spell DC - 10).
             //toHit kept for backwards compat with records saved before the strHit/dexHit rename
-            enum: ["dc", "strHit", "dexHit", "toHit", "none",
+            enum: ["dc", "strHit", "dexHit", "toHit", "spellAttack", "none",
                    "athletics", "acrobatics", "intimidation", "stealth",
                    "arcana", "crafting", "deception", "diplomacy", "medicine",
                    "nature", "occultism", "performance", "religion", "society",
@@ -115,6 +120,10 @@ const actionSchema = new mongoose.Schema({
     category: { type: String, enum: ["weapon", "spell"], required: true },
     //PF2e weapon group: determines critical specialisation and (for ranged groups) which attack stat is used
     group: { type: String, enum: [...WEAPON_GROUPS] },
+    //Weapon runes (weapon-only, default none). potency adds its value to the attack roll;
+    //striking adds that many extra weapon damage dice on top of the listed damage (rank 1/2/3).
+    potency: { type: Number, min: 0, max: 3, default: 0 },
+    striking: { type: Number, min: 0, max: 3, default: 0 },
     //PF2e spell traditions (arcane/divine/occult/primal): array since spells can appear on multiple lists
     tradition: { type: [{ type: String, enum: [...SPELL_TRADITIONS] }], default: [] },
     //Doesnt require check for automatic actions

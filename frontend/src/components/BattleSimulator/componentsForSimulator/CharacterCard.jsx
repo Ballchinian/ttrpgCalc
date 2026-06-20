@@ -22,6 +22,8 @@ const effectListStyle = {
 };
 //Individual effect badge (static portion; hover colour applied via onMouseEnter/Leave)
 const effectBadgeStyle = { padding: "5px 8px", background: "rgba(255,255,255,0.1)", borderRadius: "6px", cursor: "pointer", fontSize: "14px", whiteSpace: "nowrap" };
+//Class effect/stance badge (panache, rage, arcane cascade...) - visually distinct from formal PF2e conditions
+const classEffectBadgeStyle = { ...effectBadgeStyle, background: "rgba(150,120,255,0.22)", border: "1px solid rgba(170,140,255,0.55)", fontStyle: "italic" };
 //Health edit input
 const healthInputStyle = { width: "70px", background: "#222", color: "white", border: "1px solid #555", borderRadius: "4px", padding: "2px 4px" };
 //Stack-edit input
@@ -56,14 +58,27 @@ function CharacterCard({ character }) {
     const getEffectDescription = (effect) => {
         if (effect.slug.startsWith("persistent ")) {
             const type = effect.damageType ?? effect.slug.replace("persistent ", "");
-            return `At the end of each round, you take ${effect.value} ${type} damage. Attempt a DC 15 flat check to end this condition.`;
+            /*
+                Use the effect's own recovery DC when set (e.g. a crit-spec effect may use DC 10),
+                falling back to the standard DC 15 - the end-of-round roll reads the same field.
+            */
+            const dc = effect.duration?.dc ?? 15;
+            return `At the end of each round, you take ${effect.value} ${type} damage. Attempt a DC ${dc} flat check to end this condition.`;
         }
         const info = globalEffects?.find(e => e.name.toLowerCase() === effect.slug.toLowerCase());
         return info?.description || effect.description || effect.slug;
     };
 
+    //"condition" (formal PF2e) vs "effect"/"stance" (class state) - drives the badge style so class
+    //states (panache, rage, ...) read as not-a-formal-condition
+    const getEffectCategory = (effect) => {
+        const info = globalEffects?.find(e => e.name.toLowerCase() === effect.slug.toLowerCase());
+        return info?.category ?? "condition";
+    };
+
     const maxHealth = character?.stats?.maxHealth ?? 0;
     const currentHealth = character?.stats?.currentHealth ?? 0;
+    const tempHP = character?.stats?.tempHP ?? 0;
     const hpPercent = maxHealth ? (currentHealth / maxHealth) * 100 : 100;
 
     const handleHealthBarClick = (e) => {
@@ -116,7 +131,8 @@ function CharacterCard({ character }) {
                     </div>
                 ) : (
                     <ProgressBar
-                        variant="success" now={hpPercent} label={`${currentHealth}/${maxHealth}`}
+                        variant="success" now={hpPercent}
+                        label={`${currentHealth}/${maxHealth}${tempHP > 0 ? ` 🛡️+${tempHP}` : ""}`}
                         className="mb-2" onClick={handleHealthBarClick} style={progressBarStyle}
                     />
                 )}
@@ -141,8 +157,8 @@ function CharacterCard({ character }) {
                                 <OverlayTrigger key={effect.slug} placement="top" overlay={<Tooltip>{getEffectDescription(effect)}</Tooltip>}>
                                     <div
                                         onClick={e => { e.stopPropagation(); card.handleChangedEffect(effect); }}
-                                        style={effectBadgeStyle}
-                                        onMouseEnter={e => { e.currentTarget.style.color = "#28a745"; e.currentTarget.style.transform = "scale(1.05)"; }}
+                                        style={getEffectCategory(effect) !== "condition" ? classEffectBadgeStyle : effectBadgeStyle}
+                                        onMouseEnter={e => { e.currentTarget.style.color = "var(--app-success)"; e.currentTarget.style.transform = "scale(1.05)"; }}
                                         onMouseLeave={e => { e.currentTarget.style.color = ""; e.currentTarget.style.transform = "scale(1)"; }}
                                     >
                                         {effect.slug}{(effect.value > 1 || effect.slug.startsWith("persistent ")) && effect.slug !== OFF_GUARD ? ` (${effect.value})` : ""}
@@ -237,6 +253,7 @@ function CharacterCard({ character }) {
 
                 <div
                     onClick={card.handleOffGuardToggle}
+                    title="Toggle off-guard on this creature - e.g. when it's flanked, or for any manual off-guard (-2 circumstance AC)."
                     style={{
                         display: "flex", alignItems: "center", gap: "6px",
                         marginTop: "10px", cursor: "pointer", userSelect: "none",
@@ -247,10 +264,10 @@ function CharacterCard({ character }) {
                 >
                     <div style={{
                         width: "14px", height: "14px", borderRadius: "3px", flexShrink: 0,
-                        background: card.isOffGuard ? "#e05555" : "transparent",
-                        border: `2px solid ${card.isOffGuard ? "#e05555" : "#888"}`,
+                        background: card.isOffGuard ? "var(--app-alert)" : "transparent",
+                        border: `2px solid ${card.isOffGuard ? "var(--app-alert)" : "#888"}`,
                     }} />
-                    <span style={{ fontSize: "12px", color: card.isOffGuard ? "#e05555" : "#aaa" }}>Off-Guard</span>
+                    <span style={{ fontSize: "12px", color: card.isOffGuard ? "var(--app-alert)" : "#aaa" }}>Off-Guard (flank / manual)</span>
                 </div>
 
                 {!card.addingEffect ? (

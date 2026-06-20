@@ -3,6 +3,10 @@ import Action from "../models/actionModel.js";
 
 const isValidId = (id) => id && mongoose.Types.ObjectId.isValid(id);
 
+//The editable action fields, shared by add + update so the two stay in sync
+const pickActionFields = ({ name, type, category, group, potency, striking, tradition, check, traits, targetType, actionCost, basicSave, outcomes }) =>
+    ({ name, type, category, group, potency, striking, tradition, check, traits, targetType, actionCost, basicSave, outcomes });
+
 export const fetchActions = async (req, res) => {
     try {
         const actions = await Action.find({ playerID: req.userID }).lean();
@@ -18,11 +22,7 @@ export const fetchActions = async (req, res) => {
 
 export const addAction = async (req, res) => {
     try {
-        const { name, type, category, group, tradition, check, traits, targetType, actionCost, basicSave, outcomes } = req.body;
-        const action = new Action({
-            playerID: req.userID,
-            name, type, category, group, tradition, check, traits, targetType, actionCost, basicSave, outcomes,
-        });
+        const action = new Action({ playerID: req.userID, ...pickActionFields(req.body) });
         const saved = await action.save();
         return res.status(201).json(saved);
     } catch (err) {
@@ -36,10 +36,9 @@ export const updateAction = async (req, res) => {
     try {
         const { id } = req.params;
         if (!isValidId(id)) return res.status(400).json({ message: "Invalid action ID" });
-        const { name, type, category, group, tradition, check, traits, targetType, actionCost, basicSave, outcomes } = req.body;
         const updatedAction = await Action.findOneAndUpdate(
             { _id: id, playerID: req.userID },
-            { $set: { name, type, category, group, tradition, check, traits, targetType, actionCost, basicSave, outcomes } },
+            { $set: pickActionFields(req.body) },
             { new: true, runValidators: true }
         );
         if (!updatedAction) return res.status(404).json({ message: "Action not found" });

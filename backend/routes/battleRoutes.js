@@ -3,7 +3,7 @@ import { resolveAction } from "../controllers/battleController.js";
 
 const router = express.Router();
 
-//Resolve an action
+//Resolve a single action
 router.post("/", resolveAction);
 
 export default router;

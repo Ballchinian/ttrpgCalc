@@ -1,5 +1,23 @@
 import blankPicture from '../images/characterImages/blank character.png';
 
+//Folds the resilient rune (attributes.resilient) into the three saves so every battle consumer
+//(resolver, crit-spec prompts, UI) sees the effective save. Kept separate on the stored model so the
+//character sheet can show base saves + the rune. Idempotent only on BASE stats - always call with the
+//stored character's stats, never a battle char's already-folded stats.
+export function foldResilientSaves(stats) {
+    const res = stats?.attributes?.resilient ?? 0;
+    if (!res || !stats?.saves) return stats;
+    return {
+        ...stats,
+        saves: {
+            ...stats.saves,
+            fortitude: (stats.saves.fortitude ?? 0) + res,
+            reflex: (stats.saves.reflex ?? 0) + res,
+            will: (stats.saves.will ?? 0) + res,
+        },
+    };
+}
+
 export function createBattleCharacter(char, side, displayName) {
     return {
         id: `${char.characterName}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -11,9 +29,12 @@ export function createBattleCharacter(char, side, displayName) {
         effects: [],
         offGuardSources: [],
         mapAttacks: 0,
+        //Critical-specialization toggle, remembered per character for the whole battle (a fighter always
+        //has it, a wizard never does) instead of resetting on every action select.
+        critSpec: false,
         actionsRemaining: [true, true, true],
         stats: {
-            ...char.stats,
+            ...foldResilientSaves(char.stats),
             //Optional chaining guards against pre-namespacing characters so they degrade to 0 HP
             //(prompting a re-save) instead of crashing the battle UI
             maxHealth: char.stats.attributes?.hp ?? 0,
@@ -22,6 +43,7 @@ export function createBattleCharacter(char, side, displayName) {
         resistances: char.resistances ?? [],
         weaknesses: char.weaknesses ?? [],
         immunities: char.immunities ?? [],
+        classOption: char.classOption ?? null,
     };
 }
 

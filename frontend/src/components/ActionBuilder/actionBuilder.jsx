@@ -7,7 +7,7 @@ const BTN_STYLE = { width: "200px" };
 function ActionBuilder() {
     const navigate = useNavigate();
     return (
-        <div className="container d-flex align-items-center justify-content-center" style={CONTAINER_STYLE}>
+        <div className="action-builder container d-flex align-items-center justify-content-center" style={CONTAINER_STYLE}>
             <div className="row w-100">
                 <div className="col text-center">
                     <h4>Please choose below what you would like to make</h4>

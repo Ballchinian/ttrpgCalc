@@ -100,7 +100,7 @@ function RegisterPage() {
                                     <Form.Control.Feedback type="invalid">{errors.confirmPassword}</Form.Control.Feedback>
                                 </Form.Group>
 
-                                <Button className="mt-4" type="submit">Register</Button>
+                                <Button className="mt-4" type="submit" variant="success">Register</Button>
                             </Form>
                         )}
                     </Formik>

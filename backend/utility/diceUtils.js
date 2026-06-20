@@ -62,6 +62,13 @@ export const avgOfDice = ({ numRolled, diceRolled, modifier, bonusDice }, multip
     return Math.max(0, Math.floor((numRolled * (diceRolled + 1) / 2 + bonusAvg + modifier) * multiplier));
 };
 
+//Avg mode tags the effect with avgMultiplier; luck/choose modes use a plain multiplier. Centralises
+//the "are we averaging?" decision that was previously duplicated inline as `avgMultiplier !== undefined`.
+export const resolveDiceAmount = (number, info) =>
+    info.avgMultiplier !== undefined
+        ? avgOfDice(number, info.avgMultiplier)
+        : sumOfDice(number, info.multiplier);
+
 export const diceFormat = ({ numRolled, diceRolled, modifier, bonusDice }) => {
     const bonusStr = bonusDice ? `+${bonusDice.numRolled}d${bonusDice.diceRolled}` : "";
     const safeMod = Number.isFinite(modifier) ? modifier : 0;

@@ -1,18 +1,22 @@
 
 //Critical specialization definitions for the frontend: tooltip text + how the effect is resolved.
 //`kind` drives behaviour:
-//  "auto"           — backend injects the effect on a crit; nothing to do here.
-//  "info"           — narrative forced movement; tooltip only, no mechanical effect.
-//  "save"           — target rolls `save` vs the attacker's class DC; on a failure apply `condition`.
+//  "auto" - backend injects the effect on a crit; nothing to do here.
+//  "info" - narrative forced movement; tooltip only, no mechanical effect.
+//  "save" - target rolls `save` vs the attacker's class DC; on a failure apply `condition`.
 //                     Resolved by the NichePrompt system (luck rolls, avg computes, choose asks the user).
-//  "adjacentDamage" — choose an adjacent creature that takes the weapon's damage dice (axe).
+//  "adjacentDamage" - choose an adjacent creature that takes the weapon's damage dice (axe).
 export const CRIT_SPEC_DEFS = {
     axe: {
         description: "Choose one creature adjacent to the target and within your reach. If its AC is lower than your attack roll for the critical hit, it takes damage equal to the weapon damage dice you rolled (not doubled, no bonuses). A prompt appears after a critical hit.",
         kind: "adjacentDamage",
     },
+    bomb: {
+        description: "The target takes the bomb's splash damage (doubled if the bomb already deals splash damage to it). Splash isn't auto-modelled here - apply manually.",
+        kind: "info",
+    },
     bow: {
-        description: "If the target is adjacent to a surface, the missile pins it there: it becomes immobilized until it Interacts to succeed at a DC 10 Athletics check. Auto-applied — remove manually if the target isn't against a surface.",
+        description: "If the target is adjacent to a surface, the missile pins it there: it becomes immobilized until it Interacts to succeed at a DC 10 Athletics check. Auto-applied - remove manually if the target isn't against a surface.",
         kind: "auto",
     },
     brawling: {
@@ -24,11 +28,11 @@ export const CRIT_SPEC_DEFS = {
         kind: "info",
     },
     crossbow: {
-        description: "The bolt lodges in the target, dealing 1d8 persistent bleed damage. Auto-applied.",
+        description: "The bolt lodges in the target, dealing 1d8 persistent bleed damage plus an item bonus equal to the weapon's potency rune. Auto-applied.",
         kind: "auto",
     },
     dart: {
-        description: "The dart lodges in the target, dealing 1d6 persistent bleed damage. Auto-applied.",
+        description: "The dart lodges in the target, dealing 1d6 persistent bleed damage plus an item bonus equal to the weapon's potency rune. Auto-applied.",
         kind: "auto",
     },
     firearm: {
@@ -44,7 +48,7 @@ export const CRIT_SPEC_DEFS = {
         kind: "save", save: "fortitude", condition: "prone", conditionLabel: "prone", duration: { type: "manual" },
     },
     knife: {
-        description: "The target takes 1d6 persistent bleed damage. Auto-applied.",
+        description: "The target takes 1d6 persistent bleed damage plus an item bonus equal to the weapon's potency rune. Auto-applied.",
         kind: "auto",
     },
     pick: {

@@ -28,7 +28,7 @@ function ItemPickerModal({ show, onHide, title, items, selectedItems, onToggle }
                 <div className="d-flex flex-wrap gap-2 mb-3">
                     <Button
                         size="sm"
-                        variant={activeTag === null ? "success" : "outline-secondary"}
+                        variant={activeTag === null ? "primary" : "outline-secondary"}
                         onClick={() => setActiveTag(null)}
                     >
                         All
@@ -37,7 +37,7 @@ function ItemPickerModal({ show, onHide, title, items, selectedItems, onToggle }
                         <Button
                             key={t}
                             size="sm"
-                            variant={activeTag === t ? "success" : "outline-secondary"}
+                            variant={activeTag === t ? "primary" : "outline-secondary"}
                             onClick={() => setActiveTag(prev => prev === t ? null : t)}
                         >
                             {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -65,7 +65,7 @@ function ItemPickerModal({ show, onHide, title, items, selectedItems, onToggle }
                                     borderRadius: "4px",
                                     marginBottom: "4px",
                                     backgroundColor: isSelected ? "#1a3a2a" : "transparent",
-                                    color: isSelected ? "#28a745" : "#a6c0b7",
+                                    color: isSelected ? "var(--app-success)" : "var(--app-text)",
                                     display: "flex",
                                     justifyContent: "space-between",
                                     alignItems: "center"
@@ -84,7 +84,7 @@ function ItemPickerModal({ show, onHide, title, items, selectedItems, onToggle }
                 </div>
             </Modal.Body>
             <Modal.Footer>
-                <Button variant="secondary" onClick={() => { setActiveTag(null); setSearchText(""); onHide(); }}>Done</Button>
+                <Button variant="outline-secondary" onClick={() => { setActiveTag(null); setSearchText(""); onHide(); }}>Done</Button>
             </Modal.Footer>
         </Modal>
     );

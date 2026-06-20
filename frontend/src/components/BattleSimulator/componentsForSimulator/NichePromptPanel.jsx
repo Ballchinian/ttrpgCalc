@@ -7,7 +7,7 @@ const containerStyle = {
     left: "50%",
     transform: "translateX(-50%)",
     zIndex: 1052,
-    backgroundColor: "#1e1e2e",
+    backgroundColor: "var(--app-panel)",
     border: "1px solid rgba(180,120,60,0.5)",
     borderRadius: "8px",
     padding: "12px 16px",
@@ -100,8 +100,8 @@ function NichePromptPanel() {
                     <span style={rollNumberStyle(prompt.rollDisplay.outcome)}>{prompt.rollDisplay.roll}</span>
                     <span style={rollLabelStyle}>
                         {prompt.rollDisplay.label ?? "Flat Check"}
-                        {prompt.rollDisplay.total != null && ` — ${prompt.rollDisplay.total} vs DC ${prompt.rollDisplay.dc}`}
-                        {" — "}{prompt.rollDisplay.outcome === "failed" ? "Failed" : "Passed"}
+                        {prompt.rollDisplay.total != null && ` - ${prompt.rollDisplay.total} vs DC ${prompt.rollDisplay.dc}`}
+                        {" - "}{prompt.rollDisplay.outcome === "failed" ? "Failed" : "Passed"}
                     </span>
                 </div>
             )}
@@ -109,7 +109,7 @@ function NichePromptPanel() {
             {/* Axe: pick an adjacent creature to take the splash damage */}
             {prompt.type === "characterSelect" && prompt.characters?.length > 0 && (
                 <select style={selectStyle} value={selectedChar} onChange={e => setSelectedChar(e.target.value)}>
-                    <option value="">— Select creature —</option>
+                    <option value="">-- Select creature --</option>
                     {prompt.characters.map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                     ))}

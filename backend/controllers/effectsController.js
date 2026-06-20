@@ -7,6 +7,10 @@ export const fetchAllEffects = (req, res) => {
         maxLevel: effect.maxLevel ?? null,
         defaultDuration: effect.defaultDuration ?? { type: "manual" },
         offGuard: effect.offGuard ?? false,
+        //"condition" = formal PF2e condition; "effect"/"stance" = class state (UI badge distinction)
+        category: effect.category ?? "condition",
+        //trait-gated flat check this condition imposes on the afflicted creature's actions (e.g. grabbed -> manipulate DC 5)
+        traitFlatCheck: effect.traitFlatCheck ?? null,
         description: effect.description ?? "",
     }));
     res.json(effectsForFrontend);

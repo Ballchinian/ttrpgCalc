@@ -56,6 +56,7 @@ export function useCharacterCardActions(character) {
             durationType === "rounds" ? { type: "rounds", remaining } :
             durationType === "endOfNextTurn" ? { type: "endOfNextTurn", actorId: target.activeActor.id, actorName: target.activeActor.name, appliedRound: round ?? 1 } :
             durationType === "currentTurn" ? { type: "currentTurn", actorId: target.activeActor.id } :
+            durationType === "startOfTargetTurn" ? { type: "startOfTargetTurn", appliedRound: round ?? 1 } :
             { type: durationType };
 
         if (name.toLowerCase() === "persistent") {
@@ -90,7 +91,7 @@ export function useCharacterCardActions(character) {
 
     const handleChangedEffect = (effect) => {
         const name = effect.slug.toLowerCase();
-        if (name === OFF_GUARD) { setError("Off-Guard is managed automatically and cannot be edited directly."); return; }
+        if (name === OFF_GUARD) { setError("Off-guard follows its sources (prone, grabbed, ...) - toggle it with the 'Off-Guard (flank / manual)' control below, not on the badge."); return; }
         if (name.startsWith("persistent ")) {
             setStackEdit({
                 effect,

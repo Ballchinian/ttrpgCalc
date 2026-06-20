@@ -5,6 +5,12 @@ import Form from "react-bootstrap/Form";
 //bonusType: circumstance|item|status
 //mode: offensive|defensive
 
+/* Self-contained list styling. These lists previously relied on a global `ol { margin:auto; padding:0 }`
+   / `li { margin:25px }` (from actionBuilder.css) that leaked app-wide; now that it's scoped, the bonus
+   list carries its own layout: no bullet, no default indent, modest spacing between the three inputs. */
+const bonusListStyle = { listStyle: "none", paddingLeft: 0, margin: "0 0 12px" };
+const bonusItemStyle = { marginBottom: "10px" };
+
 function handleOffensiveChange(type, category, bonusType, value, setOffensiveBonuses) {
     setOffensiveBonuses(prev => ({
         ...prev,
@@ -39,7 +45,7 @@ const renderBonusInput = (type, category, bonusType, mode, bonusController) => {
             : defensiveBonuses?.[type]?.[bonusType] ?? 0;
 
     return (
-        <li key={bonusType}>
+        <li key={bonusType} style={bonusItemStyle}>
             {`${bonusType} Bonuses:`}
             <Form.Control
                 type="number"
@@ -69,7 +75,7 @@ export const OffensiveInputForm = ({ selectedCondition, bonusController }) => {
                     {category === "attack" && selectedCondition === "weapon" && (
                         <small className="text-muted d-block mb-1">Applies to both STR and DEX attack rolls.</small>
                     )}
-                    <ol>
+                    <ol style={bonusListStyle}>
                         {["circumstance", "item", "status"].map(bonusType =>
                             renderBonusInput(
                                 selectedCondition,
@@ -90,7 +96,7 @@ export const DefensiveInputForm = ({ selectedCondition, bonusController }) => {
     if (selectedCondition === "Select defence type") return null;
 
     return (
-        <ol>
+        <ol style={bonusListStyle}>
             {["circumstance", "item", "status"].map(bonusType =>
                 renderBonusInput(
                     selectedCondition,

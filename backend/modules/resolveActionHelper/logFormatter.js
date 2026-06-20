@@ -2,12 +2,14 @@ import { avgOfDice, diceFormat } from "../../utility/diceUtils.js";
 import { effectModules } from "../effects/effectModules/effectModules.js";
 import { OUTCOME_KEYS, OUTCOME_LABELS } from "../../data/outcomeDefs.js";
 
-//Returns structured parts: text parts are plain strings, condition parts carry description for popover
-const effectsParts = (effects, diceMode, isAttack = true) => {
+//Returns structured parts: text parts are plain strings, condition parts carry description for popover.
+//actorName labels self-targeted conditions (target:"activeActor", e.g. a bravado action granting panache)
+//so they don't read as if the struck target gained them.
+const effectsParts = (effects, diceMode, isAttack = true, actorName = null) => {
     if (!effects?.length) return [{ type: "text", text: isAttack ? "Missed" : "No effect" }];
     return effects.map(e => {
         if (e.type === "damage") {
-            const mult = e.multiplier && e.multiplier !== 1 ? ` ×${e.multiplier}` : "";
+            const mult = e.multiplier && e.multiplier !== 1 ? ` *${e.multiplier}` : "";
             if (diceMode === "avg") {
                 //Use _rawDamage (resistance/weakness-adjusted) when available, fall back to raw avg
                 const val = e._rawDamage ?? Math.round(avgOfDice(e.number, e.avgMultiplier ?? 1));
@@ -25,7 +27,7 @@ const effectsParts = (effects, diceMode, isAttack = true) => {
                 const rollStr = `[${e._diceRolls.join(", ")}]`;
                 const bonusStr = e._bonusRolls?.length ? ` + [${e._bonusRolls.join(", ")}]` : "";
                 const modStr = mod !== 0 ? ` ${mod >= 0 ? "+" : ""}${mod}` : "";
-                const mulStr = mul !== 1 ? ` ×${mul}` : "";
+                const mulStr = mul !== 1 ? ` *${mul}` : "";
                 const tooltip = `${rollStr}${bonusStr}${modStr}${mulStr} = ${total}`;
                 if (e.damageType) {
                     return { type: "typedDamage", text: `${diceFormat(e.number)}${mult} (${e.damageType}) dmg`, value: `${diceFormat(e.number)}${mult}`, damageType: e.damageType, persistent: e.category === "persistent", suffix: " dmg", modifiers: e._damageModifiers ?? [], tooltip };
@@ -39,7 +41,7 @@ const effectsParts = (effects, diceMode, isAttack = true) => {
         }
         if (e.type === "healing") {
             if (diceMode === "avg") return { type: "text", text: `~${avgOfDice(e.number, e.avgMultiplier)} heal` };
-            const mult = e.multiplier && e.multiplier !== 1 ? ` ×${e.multiplier}` : "";
+            const mult = e.multiplier && e.multiplier !== 1 ? ` *${e.multiplier}` : "";
             if (e._diceRolls) {
                 const rollSum = e._diceRolls.reduce((s, r) => s + r, 0);
                 const bonusSum = (e._bonusRolls ?? []).reduce((s, r) => s + r, 0);
@@ -49,14 +51,18 @@ const effectsParts = (effects, diceMode, isAttack = true) => {
                 const rollStr = `[${e._diceRolls.join(", ")}]`;
                 const bonusStr = e._bonusRolls?.length ? ` + [${e._bonusRolls.join(", ")}]` : "";
                 const modStr = mod !== 0 ? ` ${mod >= 0 ? "+" : ""}${mod}` : "";
-                const mulStr = mul !== 1 ? ` ×${mul}` : "";
+                const mulStr = mul !== 1 ? ` *${mul}` : "";
                 const tooltip = `${rollStr}${bonusStr}${modStr}${mulStr} = ${total}`;
                 return { type: "healing", text: `${diceFormat(e.number)}${mult} heal`, tooltip };
             }
             return { type: "text", text: `${diceFormat(e.number)}${mult} heal` };
         }
         if (e.type === "addCondition") {
-            const suffix = e.adjustBy > 0 ? ` (${e.adjustBy}) applied` : ` applied`;
+            const level = e.adjustBy > 0 ? ` (${e.adjustBy})` : "";
+            //Self-buffs (e.g. panache from a bravado action) are gained by the actor, not the target
+            const suffix = e.target === "activeActor"
+                ? `${level} gained by ${actorName ?? "self"}`
+                : `${level} applied`;
             return { type: "condition", name: e.condition, suffix, description: effectModules[e.condition.toLowerCase()]?.description ?? `${e.condition} condition` };
         }
         if (e.type === "removeCondition") {
@@ -66,14 +72,14 @@ const effectsParts = (effects, diceMode, isAttack = true) => {
     }).filter(Boolean);
 };
 
-const effectsSummary = (effects, diceMode, isAttack = true) => {
-    const parts = effectsParts(effects, diceMode, isAttack);
+const effectsSummary = (effects, diceMode, isAttack = true, actorName = null) => {
+    const parts = effectsParts(effects, diceMode, isAttack, actorName);
     return parts.map(p => p.text ?? `${p.name}${p.suffix}`).join(", ") || (isAttack ? "Missed" : "No effect");
 };
 
 //Per-outcome summary for the popout: groups conditions, damage, healing in readable form
 const outcomeSummary = (effects) => {
-    if (!effects?.length) return "—";
+    if (!effects?.length) return "-";
     const adds = [], removes = [], damages = [], heals = [];
     effects.forEach(e => {
         if (e.type === "addCondition") {
@@ -98,11 +104,11 @@ const outcomeSummary = (effects) => {
     }
     if (damages.length) parts.push(`Damage: ${damages.join(", ")}`);
     if (heals.length) parts.push(`Heal: ${heals.join(", ")}`);
-    return parts.join(". ") || "—";
+    return parts.join(". ") || "-";
 };
 
 const sign = v => v >= 0 ? `+${v}` : `${v}`;
-const prettyName = n => n === "toHit" ? "to hit" : n.charAt(0).toUpperCase() + n.slice(1);
+const prettyName = n => n === "toHit" ? "to hit" : n === "spellAttack" ? "spell attack" : n.charAt(0).toUpperCase() + n.slice(1);
 
 //Builds the left/right roll header for display
 //reverseOutcome=false: actor rolls modifier vs target's DC (attacks, grapple, trip, etc.)
@@ -131,10 +137,10 @@ const buildRollHeader = (entry) => {
 //Interleaves ", " text parts between effect parts so BodyParts renders them separated
 const withSeparators = parts => parts.flatMap((p, i) => i > 0 ? [{ type: "text", text: ", " }, p] : [p]);
 
-//Flat structured parts for a single outcome's effects — used in the choose mode outcome tree
+//Flat structured parts for a single outcome's effects - used in the choose mode outcome tree
 //Shows avg damage estimates and hoverable condition names with descriptions
 const outcomeEffectParts = (effects) => {
-    if (!effects?.length) return [{ type: "text", text: "—" }];
+    if (!effects?.length) return [{ type: "text", text: "-" }];
     const parts = effects.map(e => {
         if (e.type === "damage") {
             const val = e._rawDamage ?? avgOfDice(e.number, e.multiplier ?? 1);
@@ -153,7 +159,7 @@ const outcomeEffectParts = (effects) => {
         }
         return null;
     }).filter(Boolean);
-    return parts.length > 0 ? withSeparators(parts) : [{ type: "text", text: "—" }];
+    return parts.length > 0 ? withSeparators(parts) : [{ type: "text", text: "-" }];
 };
 
 export const logFormatter = (actionInfo, diceMode) => {
@@ -161,8 +167,8 @@ export const logFormatter = (actionInfo, diceMode) => {
 
     for (const entry of actionInfo) {
         if (entry.actionType === "automatic") {
-            const displayName = entry.activeActorName ? `${entry.activeActorName} → ${entry.name}` : entry.name;
-            lines.push({ name: displayName, body: effectsSummary(entry.effects, diceMode, false), bodyParts: withSeparators(effectsParts(entry.effects, diceMode, false)) });
+            const displayName = entry.activeActorName ? `${entry.activeActorName} -> ${entry.name}` : entry.name;
+            lines.push({ name: displayName, body: effectsSummary(entry.effects, diceMode, false, entry.activeActorName), bodyParts: withSeparators(effectsParts(entry.effects, diceMode, false, entry.activeActorName)) });
             continue;
         }
 
@@ -175,7 +181,7 @@ export const logFormatter = (actionInfo, diceMode) => {
 
             //Always build the full outcomes breakdown so the log can show all possibilities regardless of mode
             const c = entry.chanceOfOutcome ?? {};
-            //Saves: show highest damage first (criticalFailure=max → criticalSuccess=none); attacks: criticalSuccess first
+            //Saves: show highest damage first (criticalFailure=max -> criticalSuccess=none); attacks: criticalSuccess first
             const orderedKeys = isSave ? [...OUTCOME_KEYS].reverse() : OUTCOME_KEYS;
             //Keys are already roller's POV so labels need no flip; applyKey is used to look up resolvedOutcomes
             const outcomes = orderedKeys.map(key => ({
@@ -193,21 +199,21 @@ export const logFormatter = (actionInfo, diceMode) => {
             if (entry.isChooseMode) {
                 body = "Choose your outcome";
             } else if (diceMode === "luck") {
-                //outcomeKey is roller's POV — for saves that's target's POV, labels are correct as-is
+                //outcomeKey is roller's POV - for saves that's target's POV, labels are correct as-is
                 const label = OUTCOME_LABELS[entry.outcomeKey] ?? entry.outcomeKey;
                 const prefix = `${roller} rolled ${entry.diceResult} (${label}). `;
-                body = `${prefix}${effectsSummary(entry.effects, diceMode, !isSave)}`;
-                bodyParts = [{ type: "text", text: prefix }, ...withSeparators(effectsParts(entry.effects, diceMode, !isSave))];
+                body = `${prefix}${effectsSummary(entry.effects, diceMode, !isSave, entry.activeActorName)}`;
+                bodyParts = [{ type: "text", text: prefix }, ...withSeparators(effectsParts(entry.effects, diceMode, !isSave, entry.activeActorName))];
             } else {
                 const label = OUTCOME_LABELS[entry.mostLikelyKey] ?? null;
                 const prefix = label ? `(${label}). ` : "";
-                body = `${prefix}${effectsSummary(entry.effects, diceMode, !isSave)}`;
-                const parts = withSeparators(effectsParts(entry.effects, diceMode, !isSave));
+                body = `${prefix}${effectsSummary(entry.effects, diceMode, !isSave, entry.activeActorName)}`;
+                const parts = withSeparators(effectsParts(entry.effects, diceMode, !isSave, entry.activeActorName));
                 bodyParts = prefix ? [{ type: "text", text: prefix }, ...parts] : parts;
             }
 
-            //Format: "Leon → Sam" so actor and target are both visible on the log line
-            lines.push({ name: `${entry.activeActorName} → ${entry.name}`, roll, body, ...(bodyParts && { bodyParts }), outcomes, ...(entry.isChooseMode && { isChoosePending: true, targetId: entry.id }) });
+            //Format: "Leon -> Sam" so actor and target are both visible on the log line
+            lines.push({ name: `${entry.activeActorName} -> ${entry.name}`, roll, body, ...(bodyParts && { bodyParts }), outcomes, ...(entry.isChooseMode && { isChoosePending: true, targetId: entry.id }) });
         }
     }
 

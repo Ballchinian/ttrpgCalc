@@ -13,7 +13,7 @@ const itemRowStyle = {
     alignItems: "center",
     marginBottom: "4px",
     fontSize: "13px",
-    color: "#a6c0b7",
+    color: "var(--app-text)",
 };
 
 const itemHoverStyle = { cursor: "pointer" };
@@ -51,13 +51,13 @@ export function DamageModifiers({ damageTypes, resistances, setResistances, weak
                             {resistances.map((r, i) => (
                                 <div key={i} style={{ ...itemRowStyle, ...itemHoverStyle }}
                                     onClick={() => setResistances(prev => prev.filter((_, j) => j !== i))}
-                                    onMouseEnter={e => e.currentTarget.style.color = "#28a745"}
-                                    onMouseLeave={e => e.currentTarget.style.color = "#a6c0b7"}
+                                    onMouseEnter={e => e.currentTarget.style.color = "var(--app-success)"}
+                                    onMouseLeave={e => e.currentTarget.style.color = "var(--app-text)"}
                                 >
                                     <span className="text-capitalize text-truncate">{r.damageType} ({r.value})</span>
                                 </div>
                             ))}
-                            <Button size="sm" variant="outline-success" className="w-100 mt-1" onClick={() => setModalType("resistances")}>
+                            <Button size="sm" variant="outline-primary" className="w-100 mt-1" onClick={() => setModalType("resistances")}>
                                 + Add
                             </Button>
                         </CardBody>
@@ -72,13 +72,13 @@ export function DamageModifiers({ damageTypes, resistances, setResistances, weak
                             {weaknesses.map((w, i) => (
                                 <div key={i} style={{ ...itemRowStyle, ...itemHoverStyle }}
                                     onClick={() => setWeaknesses(prev => prev.filter((_, j) => j !== i))}
-                                    onMouseEnter={e => e.currentTarget.style.color = "#28a745"}
-                                    onMouseLeave={e => e.currentTarget.style.color = "#a6c0b7"}
+                                    onMouseEnter={e => e.currentTarget.style.color = "var(--app-success)"}
+                                    onMouseLeave={e => e.currentTarget.style.color = "var(--app-text)"}
                                 >
                                     <span className="text-capitalize text-truncate">{w.damageType} ({w.value})</span>
                                 </div>
                             ))}
-                            <Button size="sm" variant="outline-success" className="w-100 mt-1" onClick={() => setModalType("weaknesses")}>
+                            <Button size="sm" variant="outline-primary" className="w-100 mt-1" onClick={() => setModalType("weaknesses")}>
                                 + Add
                             </Button>
                         </CardBody>
@@ -93,13 +93,13 @@ export function DamageModifiers({ damageTypes, resistances, setResistances, weak
                             {immunities.map((imm, i) => (
                                 <div key={i} style={{ ...itemRowStyle, ...itemHoverStyle }}
                                     onClick={() => setImmunities(prev => prev.filter((_, j) => j !== i))}
-                                    onMouseEnter={e => e.currentTarget.style.color = "#28a745"}
-                                    onMouseLeave={e => e.currentTarget.style.color = "#a6c0b7"}
+                                    onMouseEnter={e => e.currentTarget.style.color = "var(--app-success)"}
+                                    onMouseLeave={e => e.currentTarget.style.color = "var(--app-text)"}
                                 >
                                     <span className="text-capitalize text-truncate">{imm}</span>
                                 </div>
                             ))}
-                            <Button size="sm" variant="outline-success" className="w-100 mt-1" onClick={() => setModalType("immunities")}>
+                            <Button size="sm" variant="outline-primary" className="w-100 mt-1" onClick={() => setModalType("immunities")}>
                                 + Add
                             </Button>
                         </CardBody>
@@ -139,9 +139,9 @@ export function DamageModifiers({ damageTypes, resistances, setResistances, weak
                                 {available.map(type => (
                                     <div
                                         key={type} onClick={() => handleAdd(type)}
-                                        style={{ cursor: "pointer", marginBottom: "4px", fontSize: "13px", color: "#a6c0b7" }}
-                                        onMouseEnter={e => e.currentTarget.style.color = "#28a745"}
-                                        onMouseLeave={e => e.currentTarget.style.color = "#a6c0b7"}
+                                        style={{ cursor: "pointer", marginBottom: "4px", fontSize: "13px", color: "var(--app-text)" }}
+                                        onMouseEnter={e => e.currentTarget.style.color = "var(--app-success)"}
+                                        onMouseLeave={e => e.currentTarget.style.color = "var(--app-text)"}
                                     >
                                         {type}
                                     </div>
@@ -151,7 +151,7 @@ export function DamageModifiers({ damageTypes, resistances, setResistances, weak
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={handleClose}>Done</Button>
+                    <Button variant="outline-secondary" onClick={handleClose}>Done</Button>
                 </Modal.Footer>
             </Modal>
         </>

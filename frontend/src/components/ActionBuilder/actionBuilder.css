@@ -1,19 +1,28 @@
-li {
-    margin:25px;
+/* Scoped to .action-builder (the chooser page + the builder shell that wraps WeaponBuilder /
+   SpellBuilder) so these form-helper rules don't leak app-wide. The bare `.card { padding:20px }`
+   in particular was shrinking the content box of unrelated cards everywhere - e.g. the
+   character-selection portraits (160px image in a 180px card) overflowed once that 20px padding
+   applied. The list/input rules are still inherited by the builder forms because the shell carries
+   the .action-builder class. */
+
+.action-builder li {
+    margin: 25px;
 }
 
-ol {
-    margin:auto;
-    padding:0;
+.action-builder ol {
+    margin: auto;
+    padding: 0;
 }
 
-
-.card {
-    display:flex;
+.action-builder .card {
+    display: flex;
     flex-direction: column;
-    padding:20px;
+    padding: 20px;
+    /* Fill the shell wrapper so the weapon and spell builders share one consistent width
+       instead of each sizing to its own content (the spell form was rendering much wider). */
+    width: 100%;
 }
 
-input {
+.action-builder input {
     width: 100%;
 }

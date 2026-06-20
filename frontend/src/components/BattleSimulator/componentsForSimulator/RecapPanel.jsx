@@ -3,6 +3,7 @@ import { Modal, Button, Accordion, OverlayTrigger, Tooltip } from "react-bootstr
 import { useRecapStore } from "../../../store/recapStore";
 import { useBattleStore } from "../../../store/battleStore";
 import { RoundSummary } from "./RoundSummary";
+import SaveBattleModal from "./SaveBattleModal";
 
 const badgeStyle = { cursor: "pointer", userSelect: "none" };
 
@@ -20,7 +21,7 @@ const TOGGLE_DEFS = [
     {
         key: "offGuard",
         label: "If Off-Guard",
-        desc: "Hypothetical: how each attack would improve if the target had off-guard (−2 to AC).",
+        desc: "Hypothetical: how each attack would improve if the target had off-guard (-2 to AC).",
     },
     {
         key: "thresholds",
@@ -45,12 +46,13 @@ const TOGGLE_DEFS = [
     {
         key: "critSpec",
         label: "Crit Spec",
-        desc: "Show what each weapon's critical specialization did after a critical hit — extra damage, conditions, or save results.",
+        desc: "Show what each weapon's critical specialization did after a critical hit - extra damage, conditions, or save results.",
     },
 ];
 
 function RecapPanel() {
     const [show, setShow] = useState(false);
+    const [showSave, setShowSave] = useState(false);
     const [toggles, setToggles] = useState({ buffs: true, successRate: true, offGuard: false, thresholds: false, map: false, luck: false, actions: false, critSpec: true });
 
     const recapHistory = useRecapStore(state => state.recapHistory);
@@ -59,6 +61,8 @@ function RecapPanel() {
     const resetBattle = useBattleStore(state => state.resetBattle);
     const showDamageModifiers = useBattleStore(state => state.settings.showDamageModifiers ?? true);
     const updateSetting = useBattleStore(state => state.updateSetting);
+    //Reactive: only allow saving once there's at least one combatant to save
+    const hasBattle = useBattleStore(state => (state.parties.heroes.length + state.parties.foes.length) > 0);
 
     const rounds = useMemo(() => Object.keys(recapHistory).map(Number).sort((a, b) => b - a), [recapHistory]);
     const toggleStat = key => setToggles(t => ({ ...t, [key]: !t[key] }));
@@ -120,10 +124,10 @@ function RecapPanel() {
             </Button>
 
             <Modal show={show} onHide={() => setShow(false)} size="lg" scrollable>
-                <Modal.Header closeButton>
+                <Modal.Header closeButton closeVariant="white" className="bg-dark text-white border-secondary">
                     <Modal.Title>Battle Recap</Modal.Title>
                 </Modal.Header>
-                <Modal.Body>
+                <Modal.Body className="bg-dark text-white">
                     <div className="d-flex gap-1 flex-wrap mb-3 align-items-center">
                         <small className="text-muted me-3">Show:</small>
                         {TOGGLE_DEFS.map(def => (
@@ -157,7 +161,7 @@ function RecapPanel() {
                     {rounds.length === 0
                         ? <p className="text-muted">No actions resolved yet.</p>
                         : <>
-                            <Accordion defaultActiveKey={String(rounds[0])}>
+                            <Accordion data-bs-theme="dark" defaultActiveKey={String(rounds[0])}>
                                 {rounds.map(r => <RoundSummary key={r} round={r} actions={recapHistory[r]} toggles={{ ...toggles, dmgModifiers: showDamageModifiers }} />)}
                             </Accordion>
                             {toggles.luck && sessionLuckDelta !== null && (
@@ -185,12 +189,17 @@ function RecapPanel() {
                           </>
                     }
                 </Modal.Body>
-                <Modal.Footer>
+                <Modal.Footer className="bg-dark border-secondary">
+                    <Button variant="success" className="me-auto" onClick={() => setShowSave(true)} disabled={!hasBattle}>
+                        Save Battle
+                    </Button>
                     <Button variant="outline-secondary" onClick={handleClearRecap}>Clear Recap</Button>
                     <Button variant="danger" onClick={handleResetBattle}>Reset Battle</Button>
                     <Button variant="secondary" onClick={() => setShow(false)}>Close</Button>
                 </Modal.Footer>
             </Modal>
+
+            <SaveBattleModal show={showSave} onHide={() => setShowSave(false)} onSaved={() => setShowSave(false)} />
         </>
     );
 }

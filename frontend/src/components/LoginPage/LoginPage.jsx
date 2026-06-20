@@ -10,6 +10,9 @@ const loginSchema = Yup.object().shape({
     password: Yup.string().required("Password is required")
 });
 
+//Dark field + light text to match the app theme (default form-control renders dark text)
+const inputStyle = { background: "#222", color: "white", border: "1px solid #555" };
+
 function LoginPage({ onLogin }) {
     const navigate = useNavigate();
 
@@ -77,6 +80,7 @@ function LoginPage({ onLogin }) {
                                         type="email" name="email" placeholder="Email"
                                         value={values.email} onChange={handleChange}
                                         isInvalid={touched.email && !!errors.email}
+                                        style={inputStyle}
                                     />
                                     <Form.Control.Feedback type="invalid">{errors.email}</Form.Control.Feedback>
                                 </Form.Group>
@@ -86,25 +90,26 @@ function LoginPage({ onLogin }) {
                                         type="password" name="password" placeholder="Password"
                                         value={values.password} onChange={handleChange}
                                         isInvalid={touched.password && !!errors.password}
+                                        style={inputStyle}
                                     />
                                     <Form.Control.Feedback type="invalid">{errors.password}</Form.Control.Feedback>
                                 </Form.Group>
 
-                                <Button className="m-1 mt-3" type="submit" id="login_button" disabled={isSubmitting}>
+                                <Button className="m-1 mt-3" type="submit" variant="success" id="login_button" disabled={isSubmitting}>
                                     Login
                                 </Button>
                             </Form>
                         )}
                     </Formik>
 
-                    <Button className="m-1" type="button" variant="outline-primary" onClick={handlePasswordReset}>
+                    <Button className="m-1" type="button" variant="outline-secondary" onClick={handlePasswordReset}>
                         Password Reset
                     </Button>
 
                     <div className="mt-4" id="new_account">
                         <Link to="/register">
-                            <Button type="button" variant="outline-success">
-                                Create a new account
+                            <Button type="button" variant="secondary">
+                                ↪ Create a new account
                             </Button>
                         </Link>
                     </div>

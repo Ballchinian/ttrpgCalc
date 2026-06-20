@@ -1,6 +1,7 @@
 import SpellForm from "./SpellForm";
 import useActionBuilder from '../shared/useActionBuilder';
 import ActionBuilderShell from '../shared/actionBuilderShell';
+import { useGameDataStore } from "../../../store/gameDataStore";
 
 const initialSpellData = {
     name: "",
@@ -23,6 +24,9 @@ const initialSpellData = {
 };
 
 function SpellBuilder() {
+    //gameDataStore already fetches these on app mount; drives the spell trait editor
+    const traitDefs = useGameDataStore(state => state.traitDefs);
+
     const {
         actionData: spellData, setActionData: setSpellData,
         choices: spellChoices,
@@ -75,7 +79,8 @@ function SpellBuilder() {
                 : value !== "ac"
                     ? prev.traits.filter(t => t.name !== "attack")
                     : prev.traits;
-            const actorStat = ["will", "reflex", "fortitude"].includes(value) ? "dc" : value === "ac" ? "toHit" : "none";
+            //Spell attacks (vs AC) roll the spell attack modifier (spell DC - 10), not str/dex
+            const actorStat = ["will", "reflex", "fortitude"].includes(value) ? "dc" : value === "ac" ? "spellAttack" : "none";
             return { ...prev, traits, check: { targetStat: value, actorStat } };
         });
     }
@@ -161,6 +166,8 @@ function SpellBuilder() {
         >
             <SpellForm
                 spellData={spellData}
+                setSpellData={setSpellData}
+                traitDefs={traitDefs}
                 handleSpellChange={handleSpellChange}
                 handleTraditionToggle={handleTraditionToggle}
                 handleSaveTypeChange={handleSaveTypeChange}

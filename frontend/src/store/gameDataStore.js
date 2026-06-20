@@ -11,6 +11,7 @@ export const useGameDataStore = create((set, get) => ({
     characterList: [],
     globalActionNames: [],
     globalActions: {},
+    featureActions: {},
     globalEffects: [],
     offGuardActions: [],
     spellData: [],
@@ -32,9 +33,10 @@ export const useGameDataStore = create((set, get) => ({
                 return res.json();
             };
 
-            const [characters, globalActionsJson, effects, offGuard, allItemsJson, traitData, damageTypesData] = await Promise.all([
+            const [characters, globalActionsJson, featureActionsJson, effects, offGuard, allItemsJson, traitData, damageTypesData] = await Promise.all([
                 apiFetch(`${BACKEND_BASE_URL}/characters`).then(r => safeJson(r, "characters")),
                 apiFetch(`${BACKEND_BASE_URL}/actions/globalActions`).then(r => safeJson(r, "globalActions")),
+                apiFetch(`${BACKEND_BASE_URL}/actions/featureActions`).then(r => safeJson(r, "featureActions")),
                 apiFetch(`${BACKEND_BASE_URL}/actions/effects`).then(r => safeJson(r, "effects")),
                 apiFetch(`${BACKEND_BASE_URL}/actions/globalOffGuardEffects`).then(r => safeJson(r, "offGuard")),
                 apiFetch(`${BACKEND_BASE_URL}/actions`).then(r => safeJson(r, "actions")),
@@ -47,6 +49,7 @@ export const useGameDataStore = create((set, get) => ({
                 characterList: Array.isArray(characters) ? characters : Object.values(characters),
                 globalActions: globalActionsJson,
                 globalActionNames: Object.keys(globalActionsJson),
+                featureActions: featureActionsJson,
                 globalEffects: effects,
                 offGuardActions: offGuard,
                 allItems: allItemsJson,
@@ -79,12 +82,13 @@ export const useGameDataStore = create((set, get) => ({
 
     //Returns the MAP penalty and whether the action counts as an attack, based on its traits
     getActionTraits: (actionName) => {
-        const { globalActions, allItems, traitDefs } = get();
+        const { globalActions, featureActions, allItems, traitDefs } = get();
         const defaults = { mapPenalty: 5, countsAsAttack: false };
         if (!actionName) return defaults;
 
         const traits = (
             globalActions[actionName]?.traits ??
+            featureActions[actionName]?.traits ??
             allItems.weapons?.find(w => w.name === actionName)?.traits ??
             allItems.spells?.find(s => s.name === actionName)?.traits ??
             []

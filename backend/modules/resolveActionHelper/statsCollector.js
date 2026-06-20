@@ -37,7 +37,7 @@ function conditionSourcesWithLevel(breakdown, characterEffects) {
     )];
 }
 
-//Probability-weighted damage multiplier (roller's POV probs × roller's POV multiplier table)
+//Probability-weighted damage multiplier (roller's POV probs * roller's POV multiplier table)
 function expectedMultiplier(probs, multTable = MULTIPLIER_TABLE) {
     return OUTCOME_KEYS.reduce((sum, key) => sum + (probs[key] ?? 0) * (multTable[key] ?? 0), 0);
 }
@@ -122,7 +122,7 @@ function analyzeConditionImpact(entry, isSave, dcBreakdown, modBreakdown, diceMo
             //Use actual rolled damage when the actual outcome dealt damage; otherwise fall back to average
             damageGain = rawDamageForOutcome(entry.outcomeEffects, entry.outcomeKey) - rawDamageForOutcome(entry.outcomeEffects, baselineOutcome);
         }
-        //outcomeKey is already roller's POV (target's POV for saves) — use directly as display keys
+        //outcomeKey is already roller's POV (target's POV for saves) - use directly as display keys
         return { ...base, from: baselineOutcome, to: entry.outcomeKey, damageGain };
     }
 
@@ -143,7 +143,7 @@ function analyzeConditionImpact(entry, isSave, dcBreakdown, modBreakdown, diceMo
     return null;
 }
 
-//Per-condition isolated impact — returns [{ conditionName, damageGain }] for session breakdown
+//Per-condition isolated impact - returns [{ conditionName, damageGain }] for session breakdown
 function analyzePerConditionImpacts(entry, isSave, dcBreakdown, modBreakdown, diceMode, targetChar) {
     const multTable = isSave ? BASIC_SAVE_MULTIPLIER_TABLE : MULTIPLIER_TABLE;
     const damageEffects = getDamageEffects(entry, diceMode);
@@ -210,7 +210,7 @@ function analyzePerConditionImpacts(entry, isSave, dcBreakdown, modBreakdown, di
 function analyzeOffGuardImpact(entry, isSave, dcBreakdown, diceMode, activeActorName, targetChar) {
     //Off-guard only affects AC, spell saves (reverseOutcome) use Will/Fort/Reflex, skip entirely
     if (isSave) return { offGuardBenefit: 0, impact: null };
-    //Target already has off-guard (or prone/any offGuard:true effect) — hypothesis is moot
+    //Target already has off-guard (or prone/any offGuard:true effect) - hypothesis is moot
     if (targetChar?.effects?.some(e => effectModules[e.slug]?.offGuard === true)) {
         return { offGuardBenefit: 0, impact: null };
     }
@@ -231,11 +231,11 @@ function analyzeOffGuardImpact(entry, isSave, dcBreakdown, diceMode, activeActor
         if (fromMult > 0 && entry.resolvedDamage !== undefined) {
             //Use actual rolled damage when fromMult > 0 (attack connected)
             damageGain = Math.round(entry.resolvedDamage * (toMult - fromMult) / fromMult);
-            damageGainTooltip = `${entry.resolvedDamage} actual dmg × (×${toMult} − ×${fromMult}) / ×${fromMult} = ${damageGain}`;
+            damageGainTooltip = `${entry.resolvedDamage} actual dmg * (*${toMult} - *${fromMult}) / *${fromMult} = ${damageGain}`;
         } else {
-            //Miss → upgraded outcome: roll hypothetical damage applying the tier multiplier to
+            //Miss -> upgraded outcome: roll hypothetical damage applying the tier multiplier to
             //null-multiplier effects (elemental traits use null so the tier table governs, same
-            //as resolveCheckedAction does — without this, elemental dice show at 1× on a failure)
+            //as resolveCheckedAction does - without this, elemental dice show at 1* on a failure)
             const fallbackMult = MULTIPLIER_TABLE[ogOutcome] ?? 0;
             const ogEffects = (entry.outcomeEffects?.[ogOutcome]?.effects ?? []).filter(e => e.type === "damage");
             const tooltipParts = [];
@@ -252,7 +252,7 @@ function analyzeOffGuardImpact(entry, isSave, dcBreakdown, diceMode, activeActor
                 if (bonusRolls.length > 0) expr += ` + [${bonusRolls.join(", ")}]`;
                 if (modifier > 0) expr += ` + ${modifier}`;
                 else if (modifier < 0) expr += ` ${modifier}`;
-                if (multiplier !== 1) expr += ` = ${rollSum + modifier} ×${multiplier} = ${modifiedTotal}`;
+                if (multiplier !== 1) expr += ` = ${rollSum + modifier} *${multiplier} = ${modifiedTotal}`;
                 else expr += ` = ${modifiedTotal}`;
                 tooltipParts.push(expr);
             }
@@ -318,7 +318,7 @@ function buildEffectTooltip(effects, type) {
         if (bonusRolls.length > 0) expr += ` + [${bonusRolls.join(", ")}]`;
         if (mod > 0) expr += ` + ${mod}`;
         if (mod < 0) expr += ` ${mod}`;
-        if (mul !== 1) expr += ` = ${preTotal} ×${mul} = ${total}`;
+        if (mul !== 1) expr += ` = ${preTotal} *${mul} = ${total}`;
         else           expr += ` = ${total}`;
         return expr;
     }).join(" | ");
@@ -333,14 +333,14 @@ function buildRollOutcome(entry, isSave, modBreakdown, offGuardBenefit) {
         const probs = entry.chanceOfOutcome ?? {};
         avgOutcomeKey = OUTCOME_KEYS.reduce((b, key) => (probs[key] ?? 0) > (probs[b] ?? 0) ? key : b);
     }
-    //cf/f are the maximum die faces for that tier; s/cs are the minimum — all display as ≤ or ≥ respectively
+    //cf/f are the maximum die faces for that tier; s/cs are the minimum - all display as ≤ or ≥ respectively
     const threshold = entry.targetDC.value - entry.rollModifier.value;
     const thresholds = { cf: threshold - CRIT_THRESHOLD_SHIFT, f: threshold - 1, s: threshold, cs: threshold + CRIT_THRESHOLD_SHIFT };
     const mapEntry = modBreakdown.find(b => b.source === "MAP");
     const mapPenalty = mapEntry ? Math.abs(mapEntry.valueChange) : 0;
     const diceTooltip = buildEffectTooltip(entry.effects, "damage");
     const healingTooltip = buildEffectTooltip(entry.effects, "healing");
-    //outcomeKey is already roller's POV (target's POV for saves) — no flip needed
+    //outcomeKey is already roller's POV (target's POV for saves) - no flip needed
     return { outcomeKey: entry.outcomeKey, diceResult: entry.diceResult, avgOutcomeKey, thresholds, offGuardBenefit: isSave ? 0 : offGuardBenefit, mapPenalty, isSave, diceTooltip, healingTooltip, avgDamage: entry.avgDamage, avgHealing: entry.avgHealing };
 }
 
@@ -350,7 +350,7 @@ function buildRollOutcome(entry, isSave, modBreakdown, offGuardBenefit) {
 export function collectStats(actionInfo, diceMode, targetCharacters = [], activeActor = null) {
     const byTarget = {};
     const ensure = id => {
-        if (!byTarget[id]) byTarget[id] = { conditionImpacts: [], offGuardImpacts: [], perConditionImpacts: [], rollOutcome: null, rawDamage: 0, rawHealing: 0, diceTooltip: null, healingTooltip: null };
+        if (!byTarget[id]) byTarget[id] = { conditionImpacts: [], offGuardImpacts: [], perConditionImpacts: [], actorAugmentImpacts: [], rollOutcome: null, rawDamage: 0, rawHealing: 0, diceTooltip: null, healingTooltip: null };
         return byTarget[id];
     };
 
@@ -366,6 +366,14 @@ export function collectStats(actionInfo, diceMode, targetCharacters = [], active
             if (ht) tgt.healingTooltip = tgt.healingTooltip ? `${tgt.healingTooltip} | ${ht}` : ht;
             const dmgMods = buildDmgModifierInfo(entry.effects);
             if (dmgMods.length > 0) tgt.dmgModifierInfo = dmgMods;
+
+            //Actor self-buff Strike augments (Finisher/Precise Strike, Rage, Sneak Attack, ...) so the
+            //recap can attribute the bonus damage. Tagged _augment by the strike-rider injectors.
+            (entry.effects ?? []).forEach(e => {
+                if (e.type === "damage" && e._augment && (e._rawDamage ?? 0) > 0) {
+                    tgt.actorAugmentImpacts.push({ label: e._augment.label, source: e._augment.source, damage: Math.round(e._rawDamage) });
+                }
+            });
         }
 
         if (entry.actionType !== "roll") continue;

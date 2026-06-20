@@ -39,7 +39,9 @@ function PopoutOverlay({ label, list, onRemove, effectOrTrait, EffectLine }) {
             <Overlay target={target.current} show={show} placement="right">
                 {(props) => (
                     <Popover {...props} onMouseEnter={open} onMouseLeave={close}>
-                        <Popover.Body>
+                        {/* Force the dark theme styling - Bootstrap's default popover renders dark
+                            text, which is unreadable on the navy --bs-body-bg the popover inherits. */}
+                        <Popover.Body style={{ backgroundColor: "var(--app-panel)", color: "white" }}>
                             <ul style={{ margin: 0, paddingLeft: "1rem" }}>
                                 {list.map((item, idx) => (
                                     <li

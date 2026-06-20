@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Form, Row, Col, OverlayTrigger, Tooltip, Button, Modal, ButtonGroup } from "react-bootstrap";
 import SpellActionTypeController from "./SpellActionTypeController";
+import SpellTraitController from "./SpellTraitController";
 import AddDamage from "./AddDamage";
 import { SPELL_TRADITIONS } from "../../../data/spellTraditions";
 
@@ -20,7 +21,7 @@ const SAVE_TIERS = [
     { identity: "criticalSuccess", label: "Crit Success" },
 ];
 
-function SpellForm({ spellData, handleSpellChange, handleTraditionToggle, handleSaveTypeChange, handleActionClick, setEffectsByTier, errors }) {
+function SpellForm({ spellData, setSpellData, traitDefs, handleSpellChange, handleTraditionToggle, handleSaveTypeChange, handleActionClick, setEffectsByTier, errors }) {
     const { basicSave, check, targetType, outcomes, actionCost, tradition } = spellData;
     //Derive which pips are active from actionCost; no need for a separate constant since it's 3 elements
     const actionCostArray = [0, 1, 2].map(i => i < actionCost);
@@ -47,7 +48,7 @@ function SpellForm({ spellData, handleSpellChange, handleTraditionToggle, handle
                             placement="top"
                             overlay={
                                 <Tooltip>
-                                    Marks this spell as a basic save. Use "Set Basic Damage" to auto-fill standard PF2e scaling: Crit Failure ×2, Failure ×1, Success ×0.5, Crit Success ×0.
+                                    Marks this spell as a basic save. Use "Set Basic Damage" to auto-fill standard PF2e scaling: Crit Failure *2, Failure *1, Success *0.5, Crit Success *0.
                                 </Tooltip>
                             }
                         >
@@ -69,7 +70,7 @@ function SpellForm({ spellData, handleSpellChange, handleTraditionToggle, handle
                         <Form.Label style={{ textAlign: "center", width: "100%" }}>Basic Damage</Form.Label>
                         <Button
                             style={{ width: "100%", padding: "4px 8px", fontSize: "0.85rem" }}
-                            variant="danger"
+                            variant="primary"
                             onClick={() => setOpen(true)}
                         >
                             Set Basic Damage
@@ -149,7 +150,7 @@ function SpellForm({ spellData, handleSpellChange, handleTraditionToggle, handle
                             <Button
                                 key={t}
                                 size="sm"
-                                variant={tradition.includes(t) ? "success" : "outline-secondary"}
+                                variant={tradition.includes(t) ? "primary" : "outline-secondary"}
                                 onClick={() => handleTraditionToggle(t)}
                             >
                                 {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -157,6 +158,14 @@ function SpellForm({ spellData, handleSpellChange, handleTraditionToggle, handle
                         ))}
                     </ButtonGroup>
                 </div>
+            </Form.Group>
+
+            {/* Traits - lets a spell carry any PF2e trait so condition gates (manipulate/concentrate/...) fire on it */}
+            <Form.Group className="mb-4">
+                <Form.Label>Traits</Form.Label>
+                <ul style={{ listStyle: "none", paddingLeft: 0, margin: 0 }}>
+                    <SpellTraitController spellData={spellData} setSpellData={setSpellData} traitDefs={traitDefs} />
+                </ul>
             </Form.Group>
 
             {/* Effects: single guaranteed section for automatic spells, full tier list otherwise */}

@@ -5,7 +5,7 @@ import { CRIT_SPEC_DEFS } from '../data/critSpecDefs';
 
 //Builds and queues the NichePrompts for crit specs that can't be auto-applied:
 //"save" specs (target saves vs the attacker's class DC) and "adjacentDamage" (axe).
-//Shared by both call sites — luck/avg from useResolveTurn, choose from applyPendingAction.
+//Shared by both call sites - luck/avg from useResolveTurn, choose from applyPendingAction.
 
 const d20 = () => Math.floor(Math.random() * 20) + 1;
 
@@ -73,7 +73,7 @@ export function queueCritSpecPrompts({ group, crittedIds, diceMode, actor, weapo
             addNichePrompt({
                 id: `${group}-${crittedId}`,
                 title: "Axe Crit Spec",
-                description: `${crittedName} was critically hit. Choose an adjacent creature whose AC is lower than your attack roll — it takes ${amount} ${avgNote}damage. Skip if none qualify.`,
+                description: `${crittedName} was critically hit. Choose an adjacent creature whose AC is lower than your attack roll - it takes ${amount} ${avgNote}damage. Skip if none qualify.`,
                 type: "characterSelect",
                 characters: allChars.filter(c => c.id !== crittedId).map(c => ({ id: c.id, name: c.name })),
                 onResolve: (charId) => {
@@ -88,14 +88,14 @@ export function queueCritSpecPrompts({ group, crittedIds, diceMode, actor, weapo
             return;
         }
 
-        //kind === "save": fail the save → apply the condition to the critted target itself
+        //kind === "save": fail the save -> apply the condition to the critted target itself
         const saveMod = Number(findChar(crittedId)?.stats?.saves?.[def.save]) || 0;
         const saveLabel = def.save.charAt(0).toUpperCase() + def.save.slice(1);
         const effect = { type: "addCondition", condition: def.condition, duration: def.duration, ...(def.value ? { adjustBy: def.value } : {}) };
         const onResolve = (outcome) => {
             if (outcome === "failed") {
                 applyConditionToChar(crittedId, effect, recapContext);
-                recordCritSpec(round, `${groupLabel}: ${crittedName} failed its ${saveLabel} save → ${def.conditionLabel}`, "applied");
+                recordCritSpec(round, `${groupLabel}: ${crittedName} failed its ${saveLabel} save -> ${def.conditionLabel}`, "applied");
             } else {
                 recordCritSpec(round, `${groupLabel}: ${crittedName} made its ${saveLabel} save (no effect)`, "none");
             }
@@ -112,14 +112,14 @@ export function queueCritSpecPrompts({ group, crittedIds, diceMode, actor, weapo
             addNichePrompt({ ...base, mode: "luck", predetermined: passed ? "passed" : "failed",
                 rollDisplay: { roll, total, dc: classDC, outcome: passed ? "passed" : "failed", label: `${saveLabel} save` },
                 description: passed
-                    ? `${crittedName} succeeds at its ${saveLabel} save — no effect.`
+                    ? `${crittedName} succeeds at its ${saveLabel} save - no effect.`
                     : `${crittedName} fails its ${saveLabel} save and is ${def.conditionLabel}.` });
         } else {
             const passed = saveSuccessChance(saveMod, classDC) >= 0.5;
             addNichePrompt({ ...base, mode: "avg", predetermined: passed ? "passed" : "failed",
                 probability: saveSuccessChance(saveMod, classDC),
                 description: passed
-                    ? `${crittedName}'s ${saveLabel} save vs your class DC is most likely to succeed — no effect.`
+                    ? `${crittedName}'s ${saveLabel} save vs your class DC is most likely to succeed - no effect.`
                     : `${crittedName}'s ${saveLabel} save vs your class DC is most likely to fail, leaving it ${def.conditionLabel}.` });
         }
     });

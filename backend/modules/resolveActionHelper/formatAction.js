@@ -43,11 +43,25 @@ export const formatAction = (diceMode, activeActor, targetCharacters, action) =>
             //Ranged: always use dexHit; Finesse: use dexHit if it beats strHit
             if (ranged && effectiveModStat === "strHit") modValue = getStat(modOwner.stats, "dexHit") ?? modValue;
             else if (finesse && effectiveModStat === "strHit") modValue = Math.max(modValue, getStat(modOwner.stats, "dexHit") ?? 0);
+            //Spell attacks roll the spell attack modifier (= spell DC - 10), not a weapon/ability stat.
+            //Derived from category + AC target so it also fixes older spells saved with actorStat "toHit".
+            const isSpellAttack = !reverseOutcome && module.category === "spell" && check.targetStat === "ac";
+            if (isSpellAttack) modValue = (getStat(modOwner.stats, "dc") ?? 0) - MODIFIER_TO_DC_OFFSET;
+            //Weapon potency rune adds to the attack roll (attacks only - never a reversed save roll)
+            const potency = (!reverseOutcome && module.category === "weapon") ? (module.potency || 0) : 0;
+            if (potency) modValue += potency;
+            const rollName = isSpellAttack ? "spellAttack" : effectiveModStat;
+            //Spell-attack bonuses are applied to the dc stat, so read its breakdown for the tooltip
+            const rollBreakdown = (isSpellAttack ? modOwner._breakdown?.dc : modOwner._breakdown?.[rollName]) ?? [];
             return {
                 id: char.id,
                 name: char.name,
                 targetDC: { name: dcStat, value: dcValue, breakdown: dcOwner._breakdown?.[dcStat] ?? [] },
-                rollModifier: { name: effectiveModStat, value: modValue, breakdown: modOwner._breakdown?.[effectiveModStat] ?? [] }
+                rollModifier: {
+                    name: rollName,
+                    value: modValue,
+                    breakdown: potency ? [...rollBreakdown, { source: "Potency rune", valueChange: potency }] : rollBreakdown,
+                }
             };
         });
     };
@@ -76,7 +90,7 @@ export const formatAction = (diceMode, activeActor, targetCharacters, action) =>
                     const mult = (reverseOutcome || e.multiplier == null) ? fallback : e.multiplier;
                     return { ...e, multiplier: mult };
                 });
-                //Expected damage/healing: base 1x dice × probability-weighted multiplier
+                //Expected damage/healing: base 1x dice * probability-weighted multiplier
                 //For saves: "failure" = 1x base; for attacks: "success" = 1x base
                 const baseKey = reverseOutcome ? "failure" : "success";
                 const baseEffects = effectiveMod.outcomes?.[baseKey]?.effects ?? [];
@@ -94,7 +108,7 @@ export const formatAction = (diceMode, activeActor, targetCharacters, action) =>
                 Object.entries(outcomeEffects).forEach(([key, outcomeData]) => {
                     resolvedOutcomes[key] = (outcomeData?.effects ?? []).map(e => {
                         if (e.type !== "damage" && e.type !== "healing") return e;
-                        //Persistent damage has no immediate HP loss — condition creation handles it
+                        //Persistent damage has no immediate HP loss - condition creation handles it
                         if (e.category === "persistent") return { ...e, resolvedValue: 0 };
                         //Use the tier multiplier for saves or when no explicit multiplier is stored
                         const fallback = multiplierTable[key] ?? 1;
@@ -107,7 +121,7 @@ export const formatAction = (diceMode, activeActor, targetCharacters, action) =>
             } else {
                 //Avg mode: damage uses the 1x baseline outcome (success for attacks, failure for saves)
                 //so avgMultiplier scales it correctly across all outcome probabilities.
-                //Conditions use the most likely outcome — a 5%-chance success shouldn't always apply its conditions.
+                //Conditions use the most likely outcome - a 5%-chance success shouldn't always apply its conditions.
                 const baseKey = reverseOutcome ? "failure" : "success";
                 const mostLikelyKey = OUTCOME_KEYS.reduce((best, key) =>
                     (chanceOfOutcome[key] ?? 0) > (chanceOfOutcome[best] ?? 0) ? key : best
@@ -135,12 +149,30 @@ export const formatAction = (diceMode, activeActor, targetCharacters, action) =>
     function withStrMod(mod) {
         if (!mod || module.category !== "weapon") return module;
         const patchEffects = effects => effects.map(e =>
-            (e.type !== "damage" || e._critSpec) ? e : { ...e, number: { ...e.number, modifier: (e.number?.modifier ?? 0) + mod } }
+            (e.type !== "damage" || e._critSpec || e._classRider) ? e : { ...e, number: { ...e.number, modifier: (e.number?.modifier ?? 0) + mod } }
         );
         return {
             ...module,
             outcomes: Object.fromEntries(
                 Object.entries(module.outcomes ?? {}).map(([key, outcome]) => [
+                    key, { ...outcome, effects: patchEffects(outcome?.effects ?? []) }
+                ])
+            )
+        };
+    }
+
+    //Striking rune: add that many extra weapon damage dice (same size) on top of the listed damage.
+    //Skips crit-spec and elemental effects (only the weapon's own physical dice are struck).
+    function withStriking(mod) {
+        const extra = module.category === "weapon" ? (module.striking || 0) : 0;
+        if (!extra) return mod;
+        const patchEffects = effects => effects.map(e =>
+            (e.type !== "damage" || e._critSpec || e._classRider) ? e : { ...e, number: { ...e.number, numRolled: (e.number?.numRolled ?? 0) + extra } }
+        );
+        return {
+            ...mod,
+            outcomes: Object.fromEntries(
+                Object.entries(mod.outcomes ?? {}).map(([key, outcome]) => [
                     key, { ...outcome, effects: patchEffects(outcome?.effects ?? []) }
                 ])
             )
@@ -155,7 +187,7 @@ export const formatAction = (diceMode, activeActor, targetCharacters, action) =>
     }
 
     //Append an elemental damage effect to every outcome; multiplier=null so the
-    //outcome multiplier table (2× crit, 1× hit, 0× miss) applies automatically
+    //outcome multiplier table (2* crit, 1* hit, 0* miss) applies automatically
     function withElementalDamage(mod, elementalDamage) {
         if (!elementalDamage) return mod;
         const number = parseDiceString(elementalDamage.diceRolled);
@@ -186,7 +218,7 @@ export const formatAction = (diceMode, activeActor, targetCharacters, action) =>
             const { mapPenalty, countsAsAttack, critThreshold, finesse, ranged, elementalDamage } = buildTraitProfile(module.traits);
             //Melee weapons add STR mod to damage; ranged get no ability modifier to damage
             const strMod = (!ranged && module.category === "weapon") ? (getStat(activeActor.stats, "str") ?? 0) : 0;
-            const effectiveModule = withElementalDamage(withStrMod(strMod), elementalDamage);
+            const effectiveModule = withElementalDamage(withStriking(withStrMod(strMod)), elementalDamage);
             let targetValueList = buildTargetList(check, reverseOutcome, finesse, ranged);
             let newMapAttacks = null;
             if (countsAsAttack) {

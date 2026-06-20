@@ -5,6 +5,7 @@ import ActionPanel from "./ActionPanel";
 import CombatLog from "./CombatLog";
 import SettingsModal from "./SettingsModal";
 import RecapPanel from "./RecapPanel";
+import InitiativeTracker from "./InitiativeTracker";
 
 const panelStyle = {
     width: "260px",
@@ -71,6 +72,7 @@ function LeftPanel() {
                         </Col>
                     )}
                 </Row>
+                <InitiativeTracker />
                 <RecapPanel />
             </div>
 

@@ -11,7 +11,7 @@ const cardStyle = {
     border: "1px solid rgba(255,255,255,0.1)",
 };
 //Sub-component static styles
-const popoverBodyStyle = { backgroundColor: "#1e1e2e", color: "white", fontSize: "12px", maxWidth: "260px", padding: "8px 10px" };
+const popoverBodyStyle = { backgroundColor: "var(--app-panel)", color: "white", fontSize: "12px", maxWidth: "260px", padding: "8px 10px" };
 const conditionUnderlineStyle = { borderBottom: "1px dotted rgba(255,255,255,0.7)", cursor: "help" };
 const damageUnderlineStyle = { borderBottom: "1px dotted rgba(255,150,100,0.8)", cursor: "help" };
 const persistentDamageUnderlineStyle = { borderBottom: "2px dotted rgba(255,100,60,0.9)", cursor: "help" };
@@ -164,8 +164,8 @@ const BreakdownChain = ({ label, breakdown }) => {
     const statName = prefixLines[prefixLines.length - 1].replace(":", "").trim();
     const finalNum = parseFloat(value);
     const baseNum = finalNum - breakdown.reduce((sum, b) => sum + b.valueChange, 0);
-    const mods = breakdown.map(b => `${b.source}: ${b.valueChange >= 0 ? `+${b.valueChange}` : b.valueChange}`).join(" → ");
-    const tipContent = `${statName}: ${baseNum} → ${mods} → ${statName}: ${finalNum}`;
+    const mods = breakdown.map(b => `${b.source}: ${b.valueChange >= 0 ? `+${b.valueChange}` : b.valueChange}`).join(" -> ");
+    const tipContent = `${statName}: ${baseNum} -> ${mods} -> ${statName}: ${finalNum}`;
 
     return (
         <span>
@@ -213,7 +213,7 @@ function CombatLog() {
                 </h5>
 
                 {lines.length === 0 && (
-                    <div style={emptyLogStyle}>—</div>
+                    <div style={emptyLogStyle}>-</div>
                 )}
 
                 {lines.map((line, i) => (

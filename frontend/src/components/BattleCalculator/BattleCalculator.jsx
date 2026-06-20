@@ -9,9 +9,13 @@ import { OffensiveInputForm, DefensiveInputForm } from "./renderBonusInputForm";
 
 const dropdownWrapStyle = { marginTop: "100px" };
 const dropdownToggleStyle = { fontSize: "40px" };
-const cardStyle = { margin: "20px" };
+/* padding is set explicitly: these cards place content directly in <Card> (no Card.Body), so they
+   need their own inner spacing now that the old app-wide `.card { padding:20px }` leak is scoped away */
+const cardStyle = { margin: "20px", padding: "20px" };
 const dropdownInnerStyle = { marginBottom: "20px" };
-const arsenalItemStyle = { cursor: "pointer", marginBottom: "8px" };
+/* listStylePosition:inside keeps the bullet within the card's padding (a bare <li> with no <ul>
+   otherwise hangs its marker off the left edge); paddingLeft adds breathing room from the side. */
+const arsenalItemStyle = { cursor: "pointer", marginBottom: "8px", listStylePosition: "inside", paddingLeft: "0.75rem" };
 
 function readBattleSession() {
     try { return JSON.parse(localStorage.getItem("battleSession") || "{}"); }
@@ -155,17 +159,51 @@ function BattleCalculator() {
         if (removing && action.selected === name) setSelectedAction("", "", "");
     }
 
-    function handleResetArsenal() {
+    //Reset just the weapons (independent from spells) - clears state + the persisted session slice
+    function handleResetWeapons() {
         setSelectedWeapons([]);
-        setSelectedSpells([]);
+        if (action.selected && selectedWeapons.includes(action.selected)) setSelectedAction("", "", "");
         if (!selectedPlayerID) return;
         const session = readBattleSession();
         if (session[selectedPlayerID]) {
-            session[selectedPlayerID] = {
-                ...session[selectedPlayerID],
-                selectedWeapons: [],
-                selectedSpells: [],
-            };
+            session[selectedPlayerID] = { ...session[selectedPlayerID], selectedWeapons: [] };
+            writeBattleSession(session);
+        }
+    }
+
+    //Reset just the spells (independent from weapons)
+    function handleResetSpells() {
+        setSelectedSpells([]);
+        if (action.selected && selectedSpells.includes(action.selected)) setSelectedAction("", "", "");
+        if (!selectedPlayerID) return;
+        const session = readBattleSession();
+        if (session[selectedPlayerID]) {
+            session[selectedPlayerID] = { ...session[selectedPlayerID], selectedSpells: [] };
+            writeBattleSession(session);
+        }
+    }
+
+    //Reset offensive bonuses to zero AND collapse the picker back to "Select attack type" so the
+    //attack/damage inputs minimise (mirrors the arsenal reset for state + session)
+    function handleResetOffensive() {
+        setOffensiveBonuses(INITIAL_OFFENSIVE_BONUSES);
+        setSelectedConditionAttack("Select attack type");
+        if (!selectedPlayerID) return;
+        const session = readBattleSession();
+        if (session[selectedPlayerID]) {
+            session[selectedPlayerID] = { ...session[selectedPlayerID], offensiveBonuses: INITIAL_OFFENSIVE_BONUSES };
+            writeBattleSession(session);
+        }
+    }
+
+    //Reset defensive bonuses to zero AND collapse the picker back to "Select defence type"
+    function handleResetDefensive() {
+        setDefensiveBonuses(INITIAL_DEFENSIVE_BONUSES);
+        setSelectedConditionDefence("Select defence type");
+        if (!selectedPlayerID) return;
+        const session = readBattleSession();
+        if (session[selectedPlayerID]) {
+            session[selectedPlayerID] = { ...session[selectedPlayerID], defensiveBonuses: INITIAL_DEFENSIVE_BONUSES };
             writeBattleSession(session);
         }
     }
@@ -208,7 +246,7 @@ function BattleCalculator() {
 
                 style={dropdownWrapStyle}
             >
-                <Dropdown.Toggle variant="dark" style={dropdownToggleStyle}>
+                <Dropdown.Toggle variant="primary" style={dropdownToggleStyle}>
                     {selectedPlayerName}
                 </Dropdown.Toggle>
                 {/*Lists all characters to select from*/}
@@ -219,11 +257,11 @@ function BattleCalculator() {
                 </Dropdown.Menu>
             </Dropdown>
             <Button
-                variant="dark"
+                variant="secondary"
                 className="m-4"
                 onClick={handleGoToSimulator}
             >
-                Go to fight!
+                ↪ Go to fight!
             </Button>
             {/* Only show the rest once a player is chosen */}
             {selectedPlayerID && (
@@ -231,20 +269,23 @@ function BattleCalculator() {
                     <div className="d-flex justify-content-center w-100">
                         {/* Left column: attack */}
                         <Card style={cardStyle}>
-                            <h2>Offensive Stats</h2>
-                            {/*Select the offensive stat*/}
-                            <Dropdown
-                                style={dropdownInnerStyle}
-                                onSelect={(key) => setSelectedConditionAttack(key)}
-                            >
-                                <Dropdown.Toggle variant="success">
-                                    {selectedConditionAttack}
-                                </Dropdown.Toggle>
-                                <Dropdown.Menu>
-                                    <Dropdown.Item eventKey="weapon">Weapon</Dropdown.Item>
-                                    <Dropdown.Item eventKey="dc">DC</Dropdown.Item>
-                                </Dropdown.Menu>
-                            </Dropdown>
+                            <h2 className="text-center mb-4">Offensive Stats</h2>
+                            {/*Select the offensive stat, with Reset pushed to the far right of the same row.
+                               gap-3 guarantees space between the picker and Reset on narrow cards.*/}
+                            <div className="d-flex justify-content-between align-items-center gap-3" style={dropdownInnerStyle}>
+                                <Dropdown onSelect={(key) => setSelectedConditionAttack(key)}>
+                                    <Dropdown.Toggle variant="primary">
+                                        {selectedConditionAttack}
+                                    </Dropdown.Toggle>
+                                    <Dropdown.Menu>
+                                        <Dropdown.Item eventKey="weapon">Weapon</Dropdown.Item>
+                                        <Dropdown.Item eventKey="dc">DC</Dropdown.Item>
+                                    </Dropdown.Menu>
+                                </Dropdown>
+                                <Button size="sm" variant="outline-danger" onClick={handleResetOffensive}>
+                                    Reset
+                                </Button>
+                            </div>
                             <OffensiveInputForm
                                 selectedCondition={selectedConditionAttack}
                                 bonusController={bonusController}
@@ -253,44 +294,49 @@ function BattleCalculator() {
 
                         {/* Middle column: arsenal */}
                         <Card style={cardStyle}>
-                            <div className="d-flex justify-content-between align-items-center">
-                                <h2 className="mb-0">Select Arsenal</h2>
-                                <Button size="sm" variant="outline-danger" onClick={handleResetArsenal}>
+                            <h2 className="text-center mb-4">Select Arsenal</h2>
+
+                            {/*Weapons: heading + own Reset, selected list, then modal picker*/}
+                            <div className="d-flex justify-content-between align-items-center gap-3 mb-1">
+                                <p className="mb-0">Weapons</p>
+                                <Button size="sm" variant="outline-danger" onClick={handleResetWeapons}>
                                     Reset
                                 </Button>
                             </div>
-
-                            {/*Weapons: selected list + modal picker*/}
-                            <p className="mb-1">Weapons</p>
                             {selectedWeapons.map(name => (
                                 <li
                                     key={name}
                                     onClick={() => toggleWeapon(name)}
                                     style={arsenalItemStyle}
-                                    onMouseEnter={e => (e.target.style.color = "#28a745")}
-                                    onMouseLeave={e => (e.target.style.color = "#a6c0b7")}
+                                    onMouseEnter={e => (e.target.style.color = "var(--app-success)")}
+                                    onMouseLeave={e => (e.target.style.color = "var(--app-text)")}
                                 >
                                     {name}
                                 </li>
                             ))}
-                            <Button size="sm" variant="outline-success" className="mt-2 mb-4" onClick={() => setShowWeaponModal(true)}>
+                            <Button size="sm" variant="outline-primary" className="mt-2 mb-4" onClick={() => setShowWeaponModal(true)}>
                                 + Add Weapon
                             </Button>
 
-                            {/*Spells: selected list + modal picker*/}
-                            <p className="mb-1">Spells</p>
+                            {/*Spells: heading + own Reset, selected list, then modal picker*/}
+                            <div className="d-flex justify-content-between align-items-center gap-3 mb-1">
+                                <p className="mb-0">Spells</p>
+                                <Button size="sm" variant="outline-danger" onClick={handleResetSpells}>
+                                    Reset
+                                </Button>
+                            </div>
                             {selectedSpells.map(name => (
                                 <li
                                     key={name}
                                     onClick={() => toggleSpell(name)}
                                     style={arsenalItemStyle}
-                                    onMouseEnter={e => (e.target.style.color = "#28a745")}
-                                    onMouseLeave={e => (e.target.style.color = "#a6c0b7")}
+                                    onMouseEnter={e => (e.target.style.color = "var(--app-success)")}
+                                    onMouseLeave={e => (e.target.style.color = "var(--app-text)")}
                                 >
                                     {name}
                                 </li>
                             ))}
-                            <Button size="sm" variant="outline-success" className="mt-2" onClick={() => setShowSpellModal(true)}>
+                            <Button size="sm" variant="outline-primary" className="mt-2" onClick={() => setShowSpellModal(true)}>
                                 + Add Spell
                             </Button>
 
@@ -314,21 +360,25 @@ function BattleCalculator() {
 
                         {/* Right column: defence */}
                         <Card style={cardStyle}>
-                            <h2>Defensive Stats</h2>
-                            <Dropdown
-                                onSelect={(key) => setSelectedConditionDefence(key)}
-                                style={dropdownInnerStyle}
-                            >
-                                <Dropdown.Toggle variant="success">
-                                    {selectedConditionDefence}
-                                </Dropdown.Toggle>
-                                <Dropdown.Menu>
-                                    <Dropdown.Item eventKey="ac">AC</Dropdown.Item>
-                                    <Dropdown.Item eventKey="fortitude">Fortitude</Dropdown.Item>
-                                    <Dropdown.Item eventKey="reflex">Reflex</Dropdown.Item>
-                                    <Dropdown.Item eventKey="will">Will</Dropdown.Item>
-                                </Dropdown.Menu>
-                            </Dropdown>
+                            <h2 className="text-center mb-4">Defensive Stats</h2>
+                            {/*Select the defensive stat, with Reset pushed to the far right of the same row.
+                               gap-3 guarantees space between the picker and Reset on narrow cards.*/}
+                            <div className="d-flex justify-content-between align-items-center gap-3" style={dropdownInnerStyle}>
+                                <Dropdown onSelect={(key) => setSelectedConditionDefence(key)}>
+                                    <Dropdown.Toggle variant="primary">
+                                        {selectedConditionDefence}
+                                    </Dropdown.Toggle>
+                                    <Dropdown.Menu>
+                                        <Dropdown.Item eventKey="ac">AC</Dropdown.Item>
+                                        <Dropdown.Item eventKey="fortitude">Fortitude</Dropdown.Item>
+                                        <Dropdown.Item eventKey="reflex">Reflex</Dropdown.Item>
+                                        <Dropdown.Item eventKey="will">Will</Dropdown.Item>
+                                    </Dropdown.Menu>
+                                </Dropdown>
+                                <Button size="sm" variant="outline-danger" onClick={handleResetDefensive}>
+                                    Reset
+                                </Button>
+                            </div>
                             <DefensiveInputForm
                                 selectedCondition={selectedConditionDefence}
                                 bonusController={bonusController}

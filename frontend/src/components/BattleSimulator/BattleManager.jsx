@@ -2,7 +2,7 @@ import { useGameDataStore } from "../../store/gameDataStore";
 import BattleSimulator from "./BattleUI";
 
 const loadingStyle = { padding: "20px", color: "white" };
-const errorStyle = { padding: "20px", color: "#e05555" };
+const errorStyle = { padding: "20px", color: "var(--app-alert)" };
 const retryStyle = { marginLeft: "10px" };
 
 //Layout parent fetches game data; this component guards rendering until it's ready.

@@ -1,62 +1,69 @@
+/* All selectors are scoped to .homepage so they style only the landing page's nav cards and intro.
+   These were previously bare `.card` / `img` / `button` / `h2` / `p` selectors that leaked app-wide
+   (Vite injects non-module CSS globally): `button { width:100%; margin-top:20px }` in particular made
+   EVERY button in the app full-width with a big top gap, and the card/img rules distorted unrelated
+   images. Scoping confines them to the homepage, matching how CharacterDesign.css /
+   CharacterSelection.css were already scoped. */
 
-.card-img-top {
+.homepage .card-img-top {
     margin: auto;
-    width: 15rem;
-    height: 100%;
+    width: 55%;
+    max-width: 13rem;
+    height: 190px;
     object-fit: contain;
+    padding-top: 1rem;
 }
 
-/*height for .card needed to keep all of them the same size*/
-.card {
-    width:18rem;
-    background-color: #091629;
-    height:100%;
+/* The three nav cards: larger, with a clear border, sharing the available width. */
+.homepage #mainLinks {
+    margin: 5vh auto;
+    gap: 2.5rem;
+    max-width: 1200px;
+    padding: 0 1rem;
+}
 
-}.card:hover {
+.homepage .card {
+    width: clamp(18rem, 26vw, 24rem);
+    background-color: #091629;
+    border: 1px solid rgba(120, 160, 220, 0.4);
+    border-radius: 14px;
+    padding: 1.25rem;
+}
+
+.homepage .card:hover {
     transform: scale(1.05);
     transition: transform 0.3s;
-    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
     cursor: pointer;
 }
 
-.card-body {
-    
+.homepage .card-body {
     text-align: center;
 }
 
-p {
-    margin-bottom: 200px;
+.homepage p {
+    margin-bottom: 80px;
 }
 
-
-/*Responsive design, main three links get reduced in size and line up vertically */
- @media (max-width:800px){
-      .card-img-top {
-        width:5rem;
-      }
-    div #mainLinks {
-        flex-direction: column; 
-        align-items: center;
-    }
-    .card {
-        margin-bottom: 20px;
-    }
-}
-
-/*For all images in my program*/
-img {
-    object-fit: contain;
-}
-
-button {
-    margin-top:20px;
-    width:100%;
-}
-
-h2 {
+.homepage h2 {
     margin-bottom: 30px;
 }
 
-Dropdown.Item {
-    width:100%;
+.homepage img {
+    object-fit: contain;
+}
+
+/* Responsive: once cards no longer fit side by side, stack them vertically and let
+   each one take most of the screen width. */
+@media (max-width: 900px) {
+    .homepage #mainLinks {
+        flex-direction: column;
+        align-items: center;
+    }
+    .homepage .card {
+        width: min(90vw, 26rem);
+    }
+    .homepage .card-img-top {
+        height: 140px;
+    }
 }

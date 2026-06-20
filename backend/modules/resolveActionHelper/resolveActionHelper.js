@@ -4,9 +4,15 @@ import { collectStats } from "./statsCollector.js";
 import { damageResolution, healingResolution, conditionResolution, applyDamageModifiers, getDamageModInfo } from "./actionResolution.js";
 import { formatAction } from "./formatAction.js";
 import { sumOfDiceDetailed, avgOfDice, sumOfDice } from "../../utility/diceUtils.js";
+import { applyDamageToPools, grantTempHP } from "../../utility/hpPools.js";
 import { MULTIPLIER_TABLE, BASIC_SAVE_MULTIPLIER_TABLE } from "../../data/outcomeDefs.js";
 
-export const resolveActionHelper = (tempActiveActor, tempTargetCharacters, action, diceMode, offensiveBonuses, characterDefensiveBonuses) => {
+/*
+    options.lite (used by the Rotation Lab's Monte-Carlo loop) skips the per-call log + stats
+    collection, which the simulator doesn't need - it reads damage from the returned HP deltas.
+    Keeps the HP/condition mutations intact so a scripted sequence still resolves correctly.
+*/
+export const resolveActionHelper = (tempActiveActor, tempTargetCharacters, action, diceMode, offensiveBonuses, characterDefensiveBonuses, options = {}) => {
 
     //Step 1: Apply bonuses and effects to the characters
     const adjustedTargetCharacters = tempTargetCharacters.map(tempTargetCharacter => {
@@ -46,7 +52,8 @@ export const resolveActionHelper = (tempActiveActor, tempTargetCharacters, actio
                         const modified = applyDamageModifiers(detailed.total, effect.damageType, affectedChar);
                         effect._rawDamage = modified;
                         effect._damageModifiers = getDamageModInfo(detailed.total, effect.damageType, affectedChar);
-                        affectedChar = { ...affectedChar, stats: { ...affectedChar.stats, currentHealth: Math.max(0, (affectedChar.stats.currentHealth ?? 0) - modified) } };
+                        //Temp HP (e.g. from Rage) absorbs damage before real HP
+                        affectedChar = { ...affectedChar, stats: { ...affectedChar.stats, ...applyDamageToPools(affectedChar.stats, modified) } };
                     } else {
                         //Avg/choose: always deterministic.
                         //avgMultiplier is set by formatAction for roll-based actions; fall back to effect.multiplier ?? 1 for automatic.
@@ -54,7 +61,8 @@ export const resolveActionHelper = (tempActiveActor, tempTargetCharacters, actio
                         const rawAvg = avgOfDice(effect.number, avgMult);
                         effect._rawDamage = applyDamageModifiers(rawAvg, effect.damageType, affectedChar);
                         effect._damageModifiers = getDamageModInfo(rawAvg, effect.damageType, affectedChar);
-                        affectedChar = { ...affectedChar, stats: { ...affectedChar.stats, currentHealth: Math.max(0, (affectedChar.stats.currentHealth ?? 0) - effect._rawDamage) } };
+                        //Temp HP (e.g. from Rage) absorbs damage before real HP
+                        affectedChar = { ...affectedChar, stats: { ...affectedChar.stats, ...applyDamageToPools(affectedChar.stats, effect._rawDamage) } };
                     }
                     updatedChars[target.id] = affectedChar;
                     break;
@@ -88,6 +96,15 @@ export const resolveActionHelper = (tempActiveActor, tempTargetCharacters, actio
                     } else {
                         if (!affectedChar) break;
                         [affectedChar] = conditionResolution([affectedChar], effect);
+                        updatedChars[target.id] = affectedChar;
+                    }
+                    break;
+                case "tempHP":
+                    //Grant temporary HP (e.g. Barbarian Rage). Doesn't stack - keeps the higher pool.
+                    if (effect.target === "activeActor") {
+                        mutableActiveActor = { ...mutableActiveActor, stats: grantTempHP(mutableActiveActor.stats, effect.value) };
+                    } else if (affectedChar) {
+                        affectedChar = { ...affectedChar, stats: grantTempHP(affectedChar.stats, effect.value) };
                         updatedChars[target.id] = affectedChar;
                     }
                     break;
@@ -144,7 +161,7 @@ export const resolveActionHelper = (tempActiveActor, tempTargetCharacters, actio
                 const fullName = `persistent ${type}`;
                 const existing = (affectedChar.effects || []).find(ef => ef.slug === fullName);
                 if (existing) {
-                    //PF2e: same damage type doesn't stack — keep the higher amount
+                    //PF2e: same damage type doesn't stack - keep the higher amount
                     if (amount > existing.value) {
                         affectedChar = { ...affectedChar, effects: (affectedChar.effects || []).map(ef =>
                             ef.slug === fullName ? { ...ef, value: amount } : ef
@@ -153,7 +170,7 @@ export const resolveActionHelper = (tempActiveActor, tempTargetCharacters, actio
                     }
                 } else {
                     affectedChar = { ...affectedChar, effects: [...(affectedChar.effects || []),
-                        { slug: fullName, value: amount, damageType: type, duration: { type: "flatCheck" } }
+                        { slug: fullName, value: amount, damageType: type, duration: { type: "flatCheck", ...(e.recoveryDC ? { dc: e.recoveryDC } : {}) } }
                     ]};
                     updatedChars[target.id] = affectedChar;
                 }
@@ -187,11 +204,11 @@ export const resolveActionHelper = (tempActiveActor, tempTargetCharacters, actio
                             .flatMap(eff => {
                                 const type = eff.damageType.toLowerCase().trim();
                                 if ((charRef?.immunities ?? []).some(i => i.toLowerCase() === type)) return [];
-                                //Respect explicit multiplier:1 on crit-spec effects so they don't get 2× for criticalSuccess
+                                //Respect explicit multiplier:1 on crit-spec effects so they don't get 2* for criticalSuccess
                                 const mult = eff.multiplier != null ? eff.multiplier : tableMult;
                                 if (mult <= 0) return [];
                                 const amount = Math.max(1, Math.round(avgOfDice(eff.number, mult)));
-                                return [{ type: "addCondition", condition: `persistent ${type}`, adjustBy: amount, damageType: type, duration: { type: "flatCheck" } }];
+                                return [{ type: "addCondition", condition: `persistent ${type}`, adjustBy: amount, damageType: type, duration: { type: "flatCheck", ...(eff.recoveryDC ? { dc: eff.recoveryDC } : {}) } }];
                             })
                         : [];
                     resolvedOutcomes[key] = persistAdd.length > 0 ? [...adjusted, ...persistAdd] : adjusted;
@@ -201,8 +218,18 @@ export const resolveActionHelper = (tempActiveActor, tempTargetCharacters, actio
         }
     }
 
-    //Step 4: Format logs and collect stats for the frontend
-    const log = logFormatter(actionInfo, diceMode);
-    const actionStats = collectStats(actionInfo, diceMode, adjustedTargetCharacters, adjustedActiveActor);
-    return { updatedActiveActor: mutableActiveActor, updatedTargetCharacters: resolvedTargetCharacters, log, pendingOutcomes, actionStats };
+    //Uncapped damage/healing dealt per target (sum of resistance-adjusted _rawDamage / _rawHealing,
+    //ignoring remaining HP) - lets the Rotation Lab report true output and net-of-healing totals.
+    const rawDamageByTarget = {};
+    const rawHealingByTarget = {};
+    actionInfo.forEach(t => {
+        if (t.id == null) return;
+        if (t.rawDamage) rawDamageByTarget[t.id] = (rawDamageByTarget[t.id] ?? 0) + t.rawDamage;
+        if (t.rawHealing) rawHealingByTarget[t.id] = (rawHealingByTarget[t.id] ?? 0) + t.rawHealing;
+    });
+
+    //Step 4: Format logs and collect stats for the frontend (skipped in lite mode for the sim's hot loop)
+    const log = options.lite ? null : logFormatter(actionInfo, diceMode);
+    const actionStats = options.lite ? null : collectStats(actionInfo, diceMode, adjustedTargetCharacters, adjustedActiveActor);
+    return { updatedActiveActor: mutableActiveActor, updatedTargetCharacters: resolvedTargetCharacters, log, pendingOutcomes, actionStats, rawDamageByTarget, rawHealingByTarget };
 };

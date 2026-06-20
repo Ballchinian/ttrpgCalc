@@ -6,7 +6,7 @@ const containerStyle = {
     left: "50%",
     transform: "translateX(-50%)",
     zIndex: 1051,
-    backgroundColor: "#1e1e2e",
+    backgroundColor: "var(--app-panel)",
     border: "1px solid rgba(200,120,255,0.4)",
     borderRadius: "8px",
     padding: "12px 16px",
@@ -38,7 +38,7 @@ function PersistentCheckNotification() {
 
     return (
         <div style={containerStyle}>
-            <div style={headerTitleStyle}>DC 15 Flat Check — Persistent Damage</div>
+            <div style={headerTitleStyle}>Flat Check - Persistent Damage</div>
             <div style={headerSubStyle}>Each persistent condition rolled to recover.</div>
 
             {results.map((r, i) => (
@@ -47,8 +47,8 @@ function PersistentCheckNotification() {
                         <span style={nameStyle}>{r.charName}</span>
                         <span style={detailStyle}>{": "}{r.effectName} ({r.amount} {r.damageType})</span>
                     </div>
-                    <span style={{ fontWeight: "600", color: r.recovered ? "#28a745" : "#dc3545", fontSize: "13px", marginLeft: "12px" }}>
-                        {r.roll} — {r.recovered ? "Recovered" : "Failed"}
+                    <span style={{ fontWeight: "600", color: r.recovered ? "var(--app-success)" : "var(--app-danger)", fontSize: "13px", marginLeft: "12px" }}>
+                        {r.roll} vs DC {r.dc ?? 15} - {r.recovered ? "Recovered" : "Failed"}
                     </span>
                 </div>
             ))}

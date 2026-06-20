@@ -7,7 +7,7 @@ import { NavLink } from 'react-router-dom';
 import './Homepage.css';
 
 function Homepage() {
-    return <div>
+    return <div className="homepage">
         <div className="d-flex justify-content-center align-items-center">
             <h1 className="text-center mt-5">Welcome to the Pathfinder 2e Calculator</h1>
         </div>
@@ -15,7 +15,7 @@ function Homepage() {
         <p className="text-center mt-5">This is a simple calculator for tabletop players using pathfinder as a basis</p>
 
   
-        <div id="mainLinks" style={{margin:"8vh 80px"}} className="justify-content-around d-flex">
+        <div id="mainLinks" className="justify-content-center d-flex flex-wrap">
             <NavLink to="/action-builder">
                 <Card>
                     <Card.Img variant="top" src={sword} />
@@ -27,7 +27,15 @@ function Homepage() {
                     </Card.Body>
                 </Card>
             </NavLink>
-
+            <NavLink to="/character-selection">
+                <Card>
+                    <Card.Img className="w-10 h-10"variant="top" src={shield} />
+                    <Card.Body>
+                        <Card.Title>Character Builder</Card.Title>
+                        <Card.Text>Build and customize your own characters for your campaigns.</Card.Text>
+                    </Card.Body>
+                </Card>
+            </NavLink>
             <NavLink to="/battle-calculator">
                 <Card>
                     <Card.Img variant="top" src={calculator} />
@@ -38,15 +46,7 @@ function Homepage() {
                 </Card>
             </NavLink>
 
-            <NavLink to="/character-selection">
-                <Card>
-                    <Card.Img className="w-10 h-10"variant="top" src={shield} />
-                    <Card.Body>
-                        <Card.Title>Character Builder</Card.Title>
-                        <Card.Text>Build and customize your own characters for your campaigns.</Card.Text>
-                    </Card.Body>
-                </Card>
-            </NavLink>
+            
         </div>
     </div>
 }

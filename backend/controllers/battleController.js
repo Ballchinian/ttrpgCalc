@@ -2,6 +2,10 @@ import { resolveActionHelper } from "../modules/resolveActionHelper/resolveActio
 import { actionModules } from "../modules/actions/actionModules/actionModules.js";
 import Action from "../models/actionModel.js";
 import { getCritSpecEffect } from "../data/critSpecDefs.js";
+import { injectGrants, injectStrikeRider, injectStrikeAugments, hydrateFeatureAction } from "../modules/classFeatures/classFeatureResolution.js";
+import { featureActions } from "../modules/classFeatures/featureActions/featureActions.js";
+import { actorHasFeatureAction } from "../data/classFeatures.js";
+import { applyVersatileDamageType } from "../modules/actions/versatileDamage.js";
 
 const BONUS_MAX = 200;
 
@@ -23,7 +27,7 @@ function sanitizeBonuses(raw) {
 
 export const resolveAction = async (req, res) => {
     try {
-        const { activeActor, targetCharacters, action, diceMode, offensiveBonuses, characterDefensiveBonuses, critSpecGroup } = req.body;
+        const { activeActor, targetCharacters, action, diceMode, offensiveBonuses, characterDefensiveBonuses, critSpecGroup, strikeRider, versatileDamageType } = req.body;
 
         if (!activeActor || !action || !Array.isArray(targetCharacters)) {
             return res.status(400).json({ message: "Missing required fields: activeActor, action, targetCharacters" });
@@ -37,14 +41,31 @@ export const resolveAction = async (req, res) => {
         const { actionData, actionType } = action;
         let resolvedAction = action;
         if (actionType === "global_action") {
-            if (typeof actionData !== "string" || !actionModules[actionData]) {
+            if (typeof actionData !== "string") {
+                return res.status(400).json({ message: "Unknown global action" });
+            }
+            const globalModule = actionModules[actionData];
+            if (globalModule) {
+                //Bravado actions grant a resource (e.g. panache) on success - inject if actor/action qualify.
+                //If unchanged, keep the string actionData so formatAction resolves it via actionModules.
+                const granted = injectGrants(globalModule, actionData, activeActor);
+                if (granted !== globalModule) resolvedAction = { ...action, actionData: granted };
+            } else if (featureActions[actionData]) {
+                //Feature/style action (Rage, Dirty Trick, ...): only usable if the actor's class grants it
+                if (!actorHasFeatureAction(activeActor.classOption, actionData)) {
+                    return res.status(403).json({ message: "Action not available to this character" });
+                }
+                //Fill $config tokens (e.g. Rage's damage/temp HP) then inject panache for bravado styles
+                const hydrated = hydrateFeatureAction(featureActions[actionData], activeActor.classOption);
+                resolvedAction = { ...action, actionData: injectGrants(hydrated, actionData, activeActor) };
+            } else {
                 return res.status(400).json({ message: "Unknown global action" });
             }
         } else if (actionType === "weapon" || actionType === "spell") {
             if (!actionData || typeof actionData !== "object" || typeof actionData._id !== "string") {
                 return res.status(400).json({ message: "Invalid action data" });
             }
-            //Re-fetch from DB to prevent client-supplied action payloads from reaching the resolver
+            //Refetch from DB to prevent client-supplied action payloads from reaching the resolver
             const dbAction = await Action.findOne({ _id: actionData._id, playerID: req.userID }).lean();
             if (!dbAction) return res.status(404).json({ message: "Action not found" });
 
@@ -65,7 +86,14 @@ export const resolveAction = async (req, res) => {
                 }
                 : dbAction;
 
-            resolvedAction = { ...action, actionData: actionDataWithCritSpec };
+            //Versatile damage-type choice first (so any precision rider inherits the chosen type),
+            //then the strike rider, then grants. injectGrants is a no-op for weapons but kept for generality.
+            const withVersatile = applyVersatileDamageType(actionDataWithCritSpec, versatileDamageType);
+            const withRider = injectStrikeRider(withVersatile, activeActor, strikeRider);
+            //Always-on Strike augments from the actor's conditions + feature autoRiders (Rage, Sneak Attack, ...)
+            const withAugments = injectStrikeAugments(withRider, activeActor, targetCharacters);
+            const finalActionData = injectGrants(withAugments, dbAction.name, activeActor);
+            resolvedAction = { ...action, actionData: finalActionData };
         } else {
             return res.status(400).json({ message: "Unknown action type" });
         }
@@ -81,11 +109,12 @@ export const resolveAction = async (req, res) => {
 
         const { updatedActiveActor, updatedTargetCharacters, log, pendingOutcomes, actionStats } = resolveActionHelper(activeActor, targetCharacters, resolvedAction, diceMode, safeOffensiveBonuses, safeDefensiveBonuses);
 
-        //Restore base stats: only currentHealth persists, strip _breakdown so client doesn't see stale bonuses
-        updatedActiveActor.stats = { ...activeActorStats, currentHealth: updatedActiveActor.stats.currentHealth };
+        //Restore base stats: currentHealth and tempHP persist (Rage etc. may have changed temp HP),
+        //strip _breakdown so client doesn't see stale bonuses
+        updatedActiveActor.stats = { ...activeActorStats, currentHealth: updatedActiveActor.stats.currentHealth, tempHP: updatedActiveActor.stats.tempHP ?? activeActorStats.tempHP };
         delete updatedActiveActor._breakdown;
         updatedTargetCharacters.forEach((updated, i) => {
-            updated.stats = { ...targetStats[i], currentHealth: updated.stats.currentHealth };
+            updated.stats = { ...targetStats[i], currentHealth: updated.stats.currentHealth, tempHP: updated.stats.tempHP ?? targetStats[i].tempHP };
             delete updated._breakdown;
         });
 

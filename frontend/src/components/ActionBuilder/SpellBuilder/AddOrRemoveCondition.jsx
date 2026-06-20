@@ -108,8 +108,8 @@ function AddOrRemoveCondition({ onConfirm, onCancel, isAdding }) {
             )}
 
             <Row>
-                <Col><Button variant="primary" onClick={handleUpdatedCondition} disabled={fetchError}>Confirm</Button></Col>
-                <Col><Button variant="secondary" onClick={onCancel}>Cancel</Button></Col>
+                <Col><Button variant="success" onClick={handleUpdatedCondition} disabled={fetchError}>Confirm</Button></Col>
+                <Col><Button variant="outline-secondary" onClick={onCancel}>Cancel</Button></Col>
             </Row>
         </div>
     );

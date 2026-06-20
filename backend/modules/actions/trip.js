@@ -29,5 +29,5 @@ export default {
             effects: [{ type: "addCondition", condition: "prone", duration: { type: "manual" }, target: "activeActor" }]
         }
     },
-    description: "Your target can't be more than one size larger than you. You try to knock a creature to the ground. Attempt an Athletics check against the target's Reflex DC."
+    description: "You try to knock a creature to the ground. Attempt an Athletics check against the target's Reflex DC."
 };

@@ -29,8 +29,8 @@ function AddHealing({ onConfirm, onCancel }) {
                 <Form.Control.Feedback type="invalid">{errors.dmgDieNumbers}</Form.Control.Feedback>
             </Form.Group>
             <Row>
-                <Col><Button variant="primary" onClick={handleConfirm}>Confirm</Button></Col>
-                <Col><Button variant="secondary" onClick={onCancel}>Cancel</Button></Col>
+                <Col><Button variant="success" onClick={handleConfirm}>Confirm</Button></Col>
+                <Col><Button variant="outline-secondary" onClick={onCancel}>Cancel</Button></Col>
             </Row>
         </div>
     );

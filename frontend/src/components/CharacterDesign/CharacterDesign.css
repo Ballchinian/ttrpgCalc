@@ -1,8 +1,17 @@
-p {
-    margin:20px;
+/* Scoped to the character-design page. These were previously bare `p` / `h1` selectors that leaked
+   app-wide (huge 8vh headings and 20px paragraph margins everywhere). Scoping + shrinking them keeps
+   the design form compact, which is the whole point of the layout. */
+.character-design p {
+    margin: 0 0 4px;
 }
 
-h1 {
-    font-size: 8vh;
+.character-design h1 {
+    font-size: 1.6rem;
+    margin: 0 0 8px;
+    word-break: break-word;
+    cursor: pointer;
 }
 
+.character-design h3 {
+    font-size: 1.15rem;
+}

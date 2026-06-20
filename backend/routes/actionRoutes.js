@@ -1,5 +1,6 @@
 import express from "express";
 import { actionModules } from "../modules/actions/actionModules/actionModules.js";
+import { featureActions } from "../modules/classFeatures/featureActions/featureActions.js";
 import { fetchAllEffects } from "../controllers/effectsController.js";
 import { offGuardEffects } from "../modules/effects/effectModules/effectModules.js";
 import { fetchActions, addAction, updateAction, deleteAction } from "../controllers/actionController.js";
@@ -10,6 +11,8 @@ const router = express.Router();
 
 //Static routes declared before /:id to prevent shadowing
 router.get("/globalActions", (_req, res) => res.json(actionModules));
+//Feature/style-granted actions (Rage, Dirty Trick, ...); the frontend shows the ones the character's class grants
+router.get("/featureActions", (_req, res) => res.json(featureActions));
 router.get("/globalOffGuardEffects", (_req, res) => res.json(offGuardEffects));
 router.get("/effects", fetchAllEffects);
 

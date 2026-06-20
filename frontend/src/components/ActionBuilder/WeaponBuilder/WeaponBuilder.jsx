@@ -9,6 +9,8 @@ import { RANGED_GROUPS } from "../../../data/weaponGroups";
 const initialWeaponData = {
     name: "",
     group: "",
+    potency: 0,
+    striking: 0,
     damage: { damageType: "", dmgDieNumbers: "" },
     traits: [{ name: "attack", label: "Attack", data: undefined }],
     targetType: "single",
@@ -75,6 +77,8 @@ function WeaponBuilder() {
             type: "roll",
             category: "weapon",
             group: weaponData.group || undefined,
+            potency: Number(weaponData.potency) || 0,
+            striking: Number(weaponData.striking) || 0,
             traits: weaponData.traits,
             targetType: weaponData.targetType,
             actionCost: weaponData.actionCost,
@@ -100,6 +104,8 @@ function WeaponBuilder() {
                 setWeaponData({
                     name: weapon.name,
                     group: weapon.group ?? "",
+                    potency: weapon.potency ?? 0,
+                    striking: weapon.striking ?? 0,
                     traits: weapon.traits ?? [],
                     targetType: weapon.targetType ?? "single",
                     actionCost: weapon.actionCost ?? 1,

@@ -1,12 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { createBattleCharacter, applyRenames, resolveDisplayName } from './battleStoreUtils';
+import { createBattleCharacter, applyRenames, resolveDisplayName, foldResilientSaves } from './battleStoreUtils';
 import { OFF_GUARD } from '../data/effectNames';
+import { applyDamageToPools } from '../utils/hpPools';
 
 const defaultState = {
+    //Which user the persisted battle belongs to, so another account doesn't load it (see claimForUser)
+    ownerUserID: null,
     parties: { heroes: [], foes: [] },
     target: { mode: null, activeActor: null, selectedTargetCharacters: [] },
-    action: { selected: "", selectedType: "", targetType: "", choosing: false, critSpec: false },
+    action: { selected: "", selectedType: "", targetType: "", choosing: false },
     settings: {
         diceMode: "avg",
         autoActions: true,
@@ -14,6 +17,7 @@ const defaultState = {
         autoDecrementConditions: true,
         ignoreHP: false,
         showDamageModifiers: true,
+        capOverkill: false,
     },
     round: 1,
     log: {},
@@ -22,6 +26,18 @@ const defaultState = {
     pendingNichePrompts: [],
     expiringConditions: [],
     persistCheckResults: [],
+    /*
+        Initiative order. `order` is the rolled/arranged turn list ([] = not rolled), each entry
+        { side, id, sourceID, name, perception, roll, total }; `turnIndex` points at whose turn it is.
+        Battle data - persists and resets with the battle.
+    */
+    initiative: { order: [], turnIndex: 0 },
+    /*
+        { id, name } of the saved-battle slot this battle was loaded from (or was last saved into),
+        so the Save dialog can default to updating that slot rather than making the user guess which
+        one to overwrite. null for a fresh battle that has never been saved.
+    */
+    loadedBattle: null,
 };
 
 
@@ -97,21 +113,24 @@ export const useBattleStore = create(
                                 return sum + applyMods(e.value, type, char);
                             }, 0);
                             if (persistTotal > 0) {
-                                workChar = { ...char, stats: { ...char.stats, currentHealth: Math.max(0, (char.stats?.currentHealth ?? 0) - persistTotal) } };
+                                //Temp HP absorbs persistent damage before real HP
+                                workChar = { ...char, stats: { ...char.stats, ...applyDamageToPools(char.stats, persistTotal) } };
                             }
 
-                            //Roll DC 15 flat check for effects using the flatCheck duration
+                            //Roll the recovery flat check (default DC 15, or the effect's custom dc)
                             const toRemove = new Set();
                             persistEffects
                                 .filter(e => e.duration?.type === "flatCheck")
                                 .forEach(e => {
+                                    const dc = e.duration?.dc ?? 15;
                                     const roll = Math.floor(Math.random() * 20) + 1;
-                                    const recovered = roll >= 15;
+                                    const recovered = roll >= dc;
                                     allFlatCheckResults.push({
                                         charName: char.name,
                                         effectName: e.slug,
                                         amount: e.value,
                                         damageType: e.damageType ?? e.slug.replace("persistent ", ""),
+                                        dc,
                                         roll,
                                         recovered,
                                     });
@@ -136,6 +155,7 @@ export const useBattleStore = create(
                                 if (e.duration?.type === "decrement")     return e.value > 0;
                                 if (e.duration?.type === "rounds")        return (e.duration.remaining ?? 0) > 0;
                                 if (e.duration?.type === "endOfNextTurn") return true;
+                                if (e.duration?.type === "startOfTargetTurn") return true; //expires on the target's turn, handled in selectTarget
                                 if (e.duration?.type === "manual")        return true;
                                 if (e.duration?.type === "flatCheck")     return true; //stays until flat check succeeds
                                 return false; //unknown type, drop rather than accumulate forever
@@ -149,7 +169,7 @@ export const useBattleStore = create(
                         ? filteredEffects.filter(e => e.slug !== OFF_GUARD)
                         : filteredEffects;
 
-                    //Start-of-turn action loss from stunned/slowed. PF2e: the two don't stack —
+                    //Start-of-turn action loss from stunned/slowed. PF2e: the two don't stack - 
                     //lose the higher value, then stunned reduces by the actions lost while slowed persists.
                     let actionsRemaining = [true, true, true];
                     let updatedFinalEffects = finalEffects;
@@ -192,20 +212,89 @@ export const useBattleStore = create(
 
             clearPersistChecks: () => set({ persistCheckResults: [] }),
 
+            //Initiative
+
+            //Builds the turn order from the current parties. mode "avg" sorts by raw Perception; "luck"
+            //rolls d20+Perception for each. ("choose" is driven by the tracker UI via setInitiativeOrder.)
+            //Ties break on higher Perception, then a coin flip - mirroring PF2e's "higher modifier wins".
+            rollInitiative: (mode) => set(state => {
+                const everyone = [...state.parties.heroes, ...state.parties.foes];
+                if (everyone.length === 0) return {};
+                const entries = everyone.map(c => {
+                    const perception = c.stats?.perception ?? 0;
+                    const roll = mode === "luck" ? Math.floor(Math.random() * 20) + 1 : null;
+                    const total = mode === "luck" ? roll + perception : perception;
+                    return { side: c.side, id: c.id, sourceID: c.sourceID, name: c.name, perception, roll, total };
+                });
+                entries.sort((a, b) => (b.total - a.total) || (b.perception - a.perception) || (Math.random() - 0.5));
+                const first = entries[0];
+                return {
+                    initiative: { order: entries, turnIndex: 0 },
+                    target: { ...state.target, activeActor: first ? { side: first.side, id: first.id, sourceID: first.sourceID } : state.target.activeActor },
+                };
+            }),
+
+            //Replace the order outright (used by Choose mode and after a manual edit)
+            setInitiativeOrder: (order) => set(state => ({
+                initiative: { order, turnIndex: 0 },
+                target: { ...state.target, activeActor: order[0] ? { side: order[0].side, id: order[0].id, sourceID: order[0].sourceID } : state.target.activeActor },
+            })),
+
+            //Drag-to-reorder: move an entry, keeping the same creature highlighted as the current turn
+            reorderInitiative: (from, to) => set(state => {
+                const order = [...state.initiative.order];
+                if (from < 0 || to < 0 || from >= order.length || to >= order.length) return {};
+                const currentId = order[state.initiative.turnIndex]?.id;
+                const [moved] = order.splice(from, 1);
+                order.splice(to, 0, moved);
+                const turnIndex = Math.max(0, order.findIndex(e => e.id === currentId));
+                return { initiative: { order, turnIndex } };
+            }),
+
+            clearInitiative: () => set({ initiative: { order: [], turnIndex: 0 } }),
+
+            //Jump to a specific combatant's turn (click an entry in the tracker)
+            setCurrentTurn: (index) => set(state => {
+                const cur = state.initiative.order[index];
+                if (!cur) return {};
+                return {
+                    initiative: { ...state.initiative, turnIndex: index },
+                    target: { ...state.target, activeActor: { side: cur.side, id: cur.id, sourceID: cur.sourceID } },
+                };
+            }),
+
+            //Advance to the next combatant; wrapping past the last ends the round (ticks durations and
+            //refreshes everyone's actions via endRound). Sets the new combatant as the active actor.
+            nextTurn: () => {
+                const { initiative } = get();
+                const { order, turnIndex } = initiative;
+                if (order.length === 0) return;
+                const isWrap = turnIndex + 1 >= order.length;
+                if (isWrap) get().endRound();
+                set(state => {
+                    const nextIndex = isWrap ? 0 : turnIndex + 1;
+                    const cur = state.initiative.order[nextIndex];
+                    return {
+                        initiative: { ...state.initiative, turnIndex: nextIndex },
+                        target: { ...state.target, activeActor: cur ? { side: cur.side, id: cur.id, sourceID: cur.sourceID } : state.target.activeActor },
+                    };
+                });
+            },
+
             //Settings
 
-            updateSetting: (key, value) => set(state => ({
-                settings: { ...state.settings, [key]: value },
+            updateSetting: (key, value) => set(state => {
+                const settings = { ...state.settings, [key]: value };
                 //Switching dice mode clears the log since results are mode-specific
-                ...(key === "diceMode" && { log: {} }),
-            })),
+                return { settings, ...(key === "diceMode" && { log: {} }) };
+            }),
 
             //Target and action selection
 
             toggleTargetActiveActor: () => set(state => ({
                 //MAP is NOT reset here, it persists across re-selections of the same actor
                 //within a round, only resetting when a DIFFERENT actor takes a turn or at endRound
-                action: { selected: "", selectedType: "", targetType: "", choosing: false, critSpec: false },
+                action: { selected: "", selectedType: "", targetType: "", choosing: false },
                 target: {
                     mode: state.target.mode === "activeActor" ? null : "activeActor",
                     activeActor: null,
@@ -267,6 +356,12 @@ export const useBattleStore = create(
                                         effect.duration.appliedRound < state.round) {
                                         expiringConditions.push({ charId: char.id, charName: char.name, charSide: char.side, effectName: effect.slug, effectNumber: effect.value, actorName: effect.duration.actorName });
                                     }
+                                    //startOfTargetTurn expires at the start of the AFFLICTED creature's turn
+                                    if (effect.duration?.type === "startOfTargetTurn" &&
+                                        char.id === newActorId &&
+                                        (effect.duration.appliedRound ?? state.round) < state.round) {
+                                        expiringConditions.push({ charId: char.id, charName: char.name, charSide: char.side, effectName: effect.slug, effectNumber: effect.value, actorName: char.name });
+                                    }
                                 });
                             });
                         });
@@ -296,14 +391,14 @@ export const useBattleStore = create(
             //actionName: selected name; targetType: precomputed by caller; selectedType: "weapon"|"spell"|"global_action"
             setSelectedAction: (selected, targetType, selectedType = "") => set(state => {
                 const prevTargetType = state.action.targetType;
-                //Clear targets when: going to self (auto-targets actor), or downgrading aoe→single
+                //Clear targets when: going to self (auto-targets actor), or downgrading aoe->single
                 //(aoe may have multiple targets selected; single only allows one)
-                //Upgrading single→aoe or keeping the same type preserves the existing selection.
+                //Upgrading single->aoe or keeping the same type preserves the existing selection.
                 const clearTargets =
                     targetType === "self" ||
                     (prevTargetType === "aoe" && targetType === "single");
                 return {
-                    action: { ...state.action, selected, selectedType, targetType, critSpec: false },
+                    action: { ...state.action, selected, selectedType, targetType },
                     target: {
                         ...state.target,
                         mode: null,
@@ -313,7 +408,6 @@ export const useBattleStore = create(
             }),
 
             setChoosingAction: (choosing) => set(state => ({ action: { ...state.action, choosing } })),
-            setCritSpec: (critSpec) => set(state => ({ action: { ...state.action, critSpec } })),
 
             //Log & error
 
@@ -375,6 +469,15 @@ export const useBattleStore = create(
                     }
                     return { ...c, actionsRemaining: next };
                 });
+                //Initiative auto-advance: when the combatant whose turn it is runs out of actions, move to
+                //the next one. Deliberately does NOT wrap - ending the round (which ticks durations via
+                //endRound) stays a manual "Next turn"/"End Round" press, so it never fires mid-resolution.
+                const { initiative } = get();
+                const cur = initiative.order[initiative.turnIndex];
+                if (cur && cur.side === side && cur.id === id && initiative.turnIndex + 1 < initiative.order.length) {
+                    const char = get().getCharByRef({ side, id });
+                    if (char && char.actionsRemaining.filter(Boolean).length === 0) get().setCurrentTurn(initiative.turnIndex + 1);
+                }
             },
 
             //Utilities
@@ -415,13 +518,15 @@ export const useBattleStore = create(
                     return {
                         ...char,
                         stats: {
-                            ...fresh.stats,
+                            ...foldResilientSaves(fresh.stats),
                             maxHealth: fresh.stats.attributes?.hp ?? char.stats.maxHealth ?? 0,
                             currentHealth: char.stats.currentHealth,
+                            tempHP: char.stats.tempHP ?? 0, //preserve live temp HP across a character edit
                         },
                         resistances: fresh.resistances ?? [],
                         weaknesses: fresh.weaknesses ?? [],
                         immunities: fresh.immunities ?? [],
+                        classOption: fresh.classOption ?? char.classOption ?? null,
                     };
                 };
                 return {
@@ -432,14 +537,29 @@ export const useBattleStore = create(
                 };
             }),
 
+            //Records which saved-battle slot the live battle belongs to (set on Load and after a Save).
+            //Pass null to detach (e.g. when the loaded slot is deleted) so the next Save starts fresh.
+            setLoadedBattle: (loadedBattle) => set({ loadedBattle }),
+
             //Used by "New Encounter", clears recap is handled by recapStore
             resetRound: () => set({ round: 1 }),
+
+            //Claims the persisted battle for a user on login. Only wipes it when a DIFFERENT user owned
+            //it (prevents one account loading another's battle); the same user keeps their battle.
+            //Returns true if the battle was reset, so the caller can also clear the recap.
+            claimForUser: (userID) => {
+                const prev = get().ownerUserID;
+                const changed = !!prev && !!userID && prev !== userID;
+                if (changed) get().resetBattle();
+                set({ ownerUserID: userID });
+                return changed;
+            },
 
             //Resets all battle state except settings; recap clearing is handled by recapStore
             resetBattle: () => set({
                 parties: { heroes: [], foes: [] },
                 target: { mode: null, activeActor: null, selectedTargetCharacters: [] },
-                action: { selected: "", selectedType: "", targetType: "", choosing: false, critSpec: false },
+                action: { selected: "", selectedType: "", targetType: "", choosing: false },
                 round: 1,
                 log: {},
                 error: "",
@@ -447,14 +567,28 @@ export const useBattleStore = create(
                 pendingNichePrompts: [],
                 expiringConditions: [],
                 persistCheckResults: [],
+                initiative: { order: [], turnIndex: 0 },
+                loadedBattle: null,
             }),
         }),
         {
             //_v2: bumped when the stored shape changed (Foundry-aligned outcome keys, damage
-            //category, slug/value conditions, namespaced stats) — discards incompatible old state
+            //category, slug/value conditions, namespaced stats) - discards incompatible old state
             name: 'battleData_v2',
+            //version 1 migration: the Rotation Lab / Action Builder was removed - coerce its dice mode
+            //back to "avg" and drop the stale actionBuilder plan data from any persisted battle.
+            version: 1,
+            migrate: (persisted) => {
+                if (!persisted) return persisted;
+                if (persisted.settings?.diceMode === "actionBuilder") {
+                    persisted.settings = { ...persisted.settings, diceMode: "avg" };
+                }
+                delete persisted.actionBuilder;
+                return persisted;
+            },
             //Only persist the state shape, not the action functions
             partialize: (state) => ({
+                ownerUserID: state.ownerUserID,
                 parties: state.parties,
                 target: {
                     activeActor: state.target.activeActor,
@@ -469,6 +603,10 @@ export const useBattleStore = create(
                 },
                 settings: state.settings,
                 round: state.round,
+                //Initiative order is battle data - persist it with the battle
+                initiative: state.initiative,
+                //Which saved slot this battle came from, so Save still defaults correctly after a reload
+                loadedBattle: state.loadedBattle,
                 //log, error, pendingAction, expiringConditions, persistCheckResults excluded: transient UI state
             }),
         }
