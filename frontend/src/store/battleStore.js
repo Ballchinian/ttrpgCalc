@@ -162,9 +162,10 @@ export const useBattleStore = create(
                             })
                         : workChar.effects;
 
-                    //Sync offGuardSources: remove any source whose condition was dropped by the filter
+                    //Sync offGuardSources: drop any condition source that the filter removed. "manual" is a
+                    //player-toggled source with no backing effect, so it persists until the player clears it.
                     const keptNames = new Set(filteredEffects.map(e => e.slug));
-                    const newSources = (workChar.offGuardSources || []).filter(src => keptNames.has(src));
+                    const newSources = (workChar.offGuardSources || []).filter(src => src === "manual" || keptNames.has(src));
                     const finalEffects = newSources.length === 0
                         ? filteredEffects.filter(e => e.slug !== OFF_GUARD)
                         : filteredEffects;

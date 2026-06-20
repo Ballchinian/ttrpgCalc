@@ -91,7 +91,21 @@ export function useCharacterCardActions(character) {
 
     const handleChangedEffect = (effect) => {
         const name = effect.slug.toLowerCase();
-        if (name === OFF_GUARD) { setError("Off-guard follows its sources (prone, grabbed, ...) - toggle it with the 'Off-Guard (flank / manual)' control below, not on the badge."); return; }
+        if (name === OFF_GUARD) {
+            /*
+                Off-guard isn't stack-editable like a normal badge. If a condition (prone, grabbed, ...)
+                is feeding it, it can only be cleared by removing that source. If nothing is feeding it,
+                it's a manual application the player added, so let the badge clear it directly.
+            */
+            const feeding = (character.offGuardSources || []).filter(s => s !== "manual" && s !== OFF_GUARD);
+            if (feeding.length > 0) {
+                setError(`Off-guard is coming from ${feeding.join(", ")} - remove that to clear it (or use the box below).`);
+                return;
+            }
+            updateCharacterInList(character.side, character.id, c =>
+                manageOffGuardFrontend({ ...c, effects: [...(c.effects || [])], offGuardSources: [...(c.offGuardSources || [])] }, "manual", "remove"));
+            return;
+        }
         if (name.startsWith("persistent ")) {
             setStackEdit({
                 effect,
