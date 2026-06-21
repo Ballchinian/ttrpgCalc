@@ -38,6 +38,35 @@ Authenticate with email and password.
 * User (name, email)
 * Sets the httpOnly refresh-token cookie
 
+### Notes
+
+* Accounts created via a social provider (no password) are rejected here and must use their provider's sign-in.
+
+---
+
+## POST `/api/auth/google`
+
+Sign in with Google. The client obtains a Google ID token (via the Google Identity button) and posts it here.
+
+### Input
+
+* `credential` — the Google ID token (JWT)
+
+### Effects
+
+* Verifies the token's signature, audience (`GOOGLE_CLIENT_ID`), and expiry.
+* Requires a Google-verified email; links to an existing account with the same email, or creates a new one.
+
+### Returns
+
+* Access token
+* User (name, email)
+* Sets the httpOnly refresh-token cookie
+
+### Notes
+
+* Rate limited. The client `VITE_GOOGLE_CLIENT_ID` and the server `GOOGLE_CLIENT_ID` must be the same OAuth web client ID.
+
 ---
 
 ## POST `/api/auth/refresh`

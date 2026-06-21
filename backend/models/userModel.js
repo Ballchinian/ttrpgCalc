@@ -3,7 +3,10 @@ import mongoose from "mongoose";
 const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
     name: { type: String, required: true, maxlength: 128 },
-    password: { type: String, required: true, maxlength: 256, select: false },
+    //Optional: accounts created via an OAuth provider (Google, ...) have no password
+    password: { type: String, maxlength: 256, select: false },
+    //OAuth provider subject ids. Not secret, so left selectable for the find-or-link lookup
+    googleId: { type: String },
     //resetToken is for password change
     resetToken: { type: String, select: false },
     resetTokenExpiry: { type: Date, select: false },
@@ -15,6 +18,8 @@ const userSchema = new mongoose.Schema({
 //Sparse indexes so null tokens don't consume index space for inactive users
 userSchema.index({ refreshToken: 1 }, { sparse: true });
 userSchema.index({ resetToken: 1 }, { sparse: true });
+//Unique+sparse: one account per Google id, but password-only users (no googleId) are exempt
+userSchema.index({ googleId: 1 }, { unique: true, sparse: true });
 //NOTE: do NOT add a TTL index on refreshTokenExpiry, MongoDB TTL deletes entire documents, not fields.
 //Expiry is enforced at query time via { refreshTokenExpiry: { $gt: Date.now() } }.
 

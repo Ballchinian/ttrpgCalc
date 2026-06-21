@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Button, Card, Form } from 'react-bootstrap';
 import { BACKEND_BASE_URL } from '../../config.js';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { useNavigate } from 'react-router-dom';
+import GoogleAuthButton from '../utility/GoogleAuthButton.jsx';
 
 const registerSchema = Yup.object().shape({
     name: Yup.string().required("Name is required"),
@@ -13,8 +15,9 @@ const registerSchema = Yup.object().shape({
         .required("Please confirm your password")
 });
 
-function RegisterPage() {
+function RegisterPage({ onLogin }) {
     const navigate = useNavigate();
+    const [oauthError, setOauthError] = useState("");
 
     const handleSubmit = async (values, { setSubmitting, setErrors }) => {
         const { name, email, password } = values;
@@ -104,6 +107,17 @@ function RegisterPage() {
                             </Form>
                         )}
                     </Formik>
+
+                    <div className="d-flex align-items-center my-3" style={{ gap: "8px" }}>
+                        <hr style={{ flex: 1, borderColor: "#555" }} />
+                        <span className="text-muted small">or</span>
+                        <hr style={{ flex: 1, borderColor: "#555" }} />
+                    </div>
+
+                    <div className="d-flex justify-content-center">
+                        <GoogleAuthButton onLogin={onLogin} onError={setOauthError} />
+                    </div>
+                    {oauthError && <div className="text-danger small mt-2">{oauthError}</div>}
                 </Card.Body>
             </Card>
         </div>

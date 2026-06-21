@@ -1,6 +1,6 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-import { login, register, requestResetPassword, confirmResetPassword, refresh, logout } from "../controllers/authController.js";
+import { login, googleLogin, register, requestResetPassword, confirmResetPassword, refresh, logout } from "../controllers/authController.js";
 
 const router = express.Router();
 
@@ -24,6 +24,7 @@ const sessionLimiter = rateLimit({
 });
 
 router.post("/login", authLimiter, login);
+router.post("/google", authLimiter, googleLogin);
 router.post("/register", authLimiter, register);
 router.post("/request-reset-password", authLimiter, requestResetPassword);
 router.post("/confirm-reset-password", authLimiter, confirmResetPassword);

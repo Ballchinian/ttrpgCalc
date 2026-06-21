@@ -4,11 +4,15 @@ import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
+import { OAuth2Client } from "google-auth-library";
 import dotenv from "dotenv";
 dotenv.config();
 
 //Converts 7 days into miliseconds for token expiry
 const REFRESH_TTL = 7 * 24 * 60 * 60 * 1000;
+
+//Verifies Google ID tokens. The audience is checked against our own client id on every verify call.
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 /* Email transport (module-level singleton so the SMTP connection pool is reused across requests).
    Provider-agnostic: set SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS to send through any SMTP service
@@ -69,7 +73,8 @@ export const login = async(req, res) => {
             return res.status(400).json({ success: false, message: "Invalid credentials" });
         }
         const user = await User.findOne({ email }).select("+password");
-        if (!user) {
+        //No password means an OAuth-only account (e.g. Google) - steer them to that sign-in method
+        if (!user || !user.password) {
             return res.status(400).json({ success: false, message: "Invalid credentials" });
         }
 
@@ -90,6 +95,58 @@ export const login = async(req, res) => {
     } catch (err) {
         console.error(err);
         return res.status(500).json({ success: false, message: "Login Failure" });
+    }
+};
+
+//Sign in with Google. The frontend sends the Google ID token (credential); we verify it, then issue our
+//own access token + refresh cookie - identical to a password login from the client's perspective.
+export const googleLogin = async (req, res) => {
+    try {
+        const { credential } = req.body;
+        if (!credential || typeof credential !== "string") {
+            return res.status(400).json({ success: false, message: "Missing Google credential" });
+        }
+        if (!process.env.GOOGLE_CLIENT_ID) {
+            console.error("GOOGLE_CLIENT_ID is not set - cannot verify Google sign-in");
+            return res.status(500).json({ success: false, message: "Google sign-in is not configured" });
+        }
+
+        //Verifies signature, audience (our client id), and expiry. Throws on any mismatch.
+        let payload;
+        try {
+            const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: process.env.GOOGLE_CLIENT_ID });
+            payload = ticket.getPayload();
+        } catch {
+            return res.status(401).json({ success: false, message: "Invalid Google credential" });
+        }
+
+        //Only trust the email when Google says it's verified, so we never link/create against an
+        //address the user hasn't proven they own.
+        if (!payload?.email || !payload.email_verified) {
+            return res.status(401).json({ success: false, message: "Google account email is not verified" });
+        }
+        const email = payload.email.toLowerCase().trim();
+        const googleId = payload.sub;
+        const name = payload.name?.trim() || email.split("@")[0];
+
+        //Match on the Google id first, then fall back to email so an existing password account links to
+        //Google (same verified email = same account) instead of creating a duplicate.
+        let user = await User.findOne({ $or: [{ googleId }, { email }] });
+        if (!user) {
+            user = await User.create({ email, name, googleId });
+        } else if (!user.googleId) {
+            user.googleId = googleId;
+            await user.save();
+        }
+
+        const accessToken = signAccessToken(user);
+        const refreshToken = await rotateRefreshToken(user);
+        setRefreshCookie(res, refreshToken);
+
+        return res.json({ success: true, accessToken, user: { name: user.name, email: user.email } });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Google sign-in failure" });
     }
 };
 

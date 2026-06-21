@@ -54,7 +54,7 @@ function App() {
         <ErrorBoundary>
         <Routes>
             <Route path="/" element={authed ? <Navigate to="/home" replace /> : <LoginPage onLogin={handleLogin} />} />
-            <Route path="/register" element={authed ? <Navigate to="/home" replace /> : <RegisterPage />} />
+            <Route path="/register" element={authed ? <Navigate to="/home" replace /> : <RegisterPage onLogin={handleLogin} />} />
             <Route path="/reset-password/:token" element={authed ? <Navigate to="/home" replace /> : <ResetPassword />} />
             <Route path="/home" element={wrap(<Homepage />)} />
             <Route path="/action-builder" element={wrap(<ActionBuilder />)} />

@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Button, Card, Form } from 'react-bootstrap';
 import { BACKEND_BASE_URL } from '../../config.js';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { Link, useNavigate } from 'react-router-dom';
 import { setToken } from '../../auth';
+import GoogleAuthButton from '../utility/GoogleAuthButton.jsx';
 
 const loginSchema = Yup.object().shape({
     email: Yup.string().email("Invalid email").required("Email is required"),
@@ -15,6 +17,7 @@ const inputStyle = { background: "#222", color: "white", border: "1px solid #555
 
 function LoginPage({ onLogin }) {
     const navigate = useNavigate();
+    const [oauthError, setOauthError] = useState("");
 
     const handleLogin = async (values, { setSubmitting, setErrors }) => {
         const { email, password } = values;
@@ -102,7 +105,18 @@ function LoginPage({ onLogin }) {
                         )}
                     </Formik>
 
-                    <Button className="m-1" type="button" variant="outline-secondary" onClick={handlePasswordReset}>
+                    <div className="d-flex align-items-center my-3 px-3" style={{ gap: "8px" }}>
+                        <hr style={{ flex: 1, borderColor: "#555" }} />
+                        <span className="text-muted small">or</span>
+                        <hr style={{ flex: 1, borderColor: "#555" }} />
+                    </div>
+
+                    <div className="d-flex justify-content-center">
+                        <GoogleAuthButton onLogin={onLogin} onError={setOauthError} />
+                    </div>
+                    {oauthError && <div className="text-danger small mt-2">{oauthError}</div>}
+
+                    <Button className="m-1 mt-3" type="button" variant="outline-secondary" onClick={handlePasswordReset}>
                         Password Reset
                     </Button>
 
