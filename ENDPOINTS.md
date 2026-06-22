@@ -69,6 +69,31 @@ Sign in with Google. The client obtains a Google ID token (via the Google Identi
 
 ---
 
+## POST `/api/auth/facebook`
+
+Sign in with Facebook. The client obtains a Facebook user access token (via the Facebook JS SDK) and posts it here.
+
+### Input
+
+* `access_token` — the Facebook user access token
+
+### Effects
+
+* Validates the token against the app (`debug_token`) and reads the profile (Graph `/me`).
+* Requires an email from Facebook; links to an existing account with the same email, or creates a new one.
+
+### Returns
+
+* Access token
+* User (name, email)
+* Sets the httpOnly refresh-token cookie
+
+### Notes
+
+* Rate limited. Requires `FACEBOOK_APP_ID` + `FACEBOOK_APP_SECRET` on the server and `VITE_FACEBOOK_APP_ID` on the client.
+
+---
+
 ## POST `/api/auth/refresh`
 
 Exchange the refresh-token cookie for a new access token.

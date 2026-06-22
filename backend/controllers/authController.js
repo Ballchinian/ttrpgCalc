@@ -98,12 +98,56 @@ export const login = async(req, res) => {
     }
 };
 
-//Sign in with Google. The frontend sends the Google ID token (credential); we verify it, then issue our
+/* Finds an existing account by provider id, or by verified email so a prior password/other-provider
+   account links to this provider (same verified email = same account) instead of duplicating. Creates
+   a new account when neither matches. providerField is "googleId" | "facebookId". */
+const upsertOAuthUser = async ({ email, name, providerField, providerId }) => {
+    let user = await User.findOne({ $or: [{ [providerField]: providerId }, { email }] });
+    if (!user) {
+        user = await User.create({ email, name, [providerField]: providerId });
+    } else if (!user[providerField]) {
+        user[providerField] = providerId;
+        await user.save();
+    }
+    return user;
+};
+
+//Issues our access token + refresh cookie and returns the standard auth response (same as password login)
+const finishOAuthLogin = async (res, user) => {
+    const accessToken = signAccessToken(user);
+    const refreshToken = await rotateRefreshToken(user);
+    setRefreshCookie(res, refreshToken);
+    return res.json({ success: true, accessToken, user: { name: user.name, email: user.email } });
+};
+
+/* Resolves a Google-verified profile from either an ID token (credential, official-button flow) or an
+   access token (custom-button flow). For the access token, tokeninfo proves it was issued to OUR client
+   (audience check, the defence against token substitution) and userinfo supplies the profile. Throws on
+   any verification failure. */
+const resolveGoogleProfile = async ({ credential, accessToken }) => {
+    if (credential) {
+        const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: process.env.GOOGLE_CLIENT_ID });
+        const p = ticket.getPayload();
+        return { email: p.email, emailVerified: p.email_verified, providerId: p.sub, name: p.name };
+    }
+    const tokenInfoRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`);
+    if (!tokenInfoRes.ok) throw new Error("tokeninfo rejected the access token");
+    const tokenInfo = await tokenInfoRes.json();
+    if (tokenInfo.aud !== process.env.GOOGLE_CLIENT_ID) throw new Error("access token audience mismatch");
+    const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!userInfoRes.ok) throw new Error("userinfo rejected the access token");
+    const profile = await userInfoRes.json();
+    return { email: profile.email, emailVerified: profile.email_verified, providerId: profile.sub, name: profile.name };
+};
+
+//Sign in with Google. Accepts an ID token (credential) or an access token; verifies it, then issues our
 //own access token + refresh cookie - identical to a password login from the client's perspective.
 export const googleLogin = async (req, res) => {
     try {
-        const { credential } = req.body;
-        if (!credential || typeof credential !== "string") {
+        const { credential, access_token: accessToken } = req.body;
+        const hasCredential = credential && typeof credential === "string";
+        const hasAccessToken = accessToken && typeof accessToken === "string";
+        if (!hasCredential && !hasAccessToken) {
             return res.status(400).json({ success: false, message: "Missing Google credential" });
         }
         if (!process.env.GOOGLE_CLIENT_ID) {
@@ -111,42 +155,69 @@ export const googleLogin = async (req, res) => {
             return res.status(500).json({ success: false, message: "Google sign-in is not configured" });
         }
 
-        //Verifies signature, audience (our client id), and expiry. Throws on any mismatch.
-        let payload;
+        let profile;
         try {
-            const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: process.env.GOOGLE_CLIENT_ID });
-            payload = ticket.getPayload();
+            profile = await resolveGoogleProfile({ credential, accessToken });
         } catch {
             return res.status(401).json({ success: false, message: "Invalid Google credential" });
         }
 
         //Only trust the email when Google says it's verified, so we never link/create against an
         //address the user hasn't proven they own.
-        if (!payload?.email || !payload.email_verified) {
+        if (!profile?.email || !profile.emailVerified) {
             return res.status(401).json({ success: false, message: "Google account email is not verified" });
         }
-        const email = payload.email.toLowerCase().trim();
-        const googleId = payload.sub;
-        const name = payload.name?.trim() || email.split("@")[0];
-
-        //Match on the Google id first, then fall back to email so an existing password account links to
-        //Google (same verified email = same account) instead of creating a duplicate.
-        let user = await User.findOne({ $or: [{ googleId }, { email }] });
-        if (!user) {
-            user = await User.create({ email, name, googleId });
-        } else if (!user.googleId) {
-            user.googleId = googleId;
-            await user.save();
-        }
-
-        const accessToken = signAccessToken(user);
-        const refreshToken = await rotateRefreshToken(user);
-        setRefreshCookie(res, refreshToken);
-
-        return res.json({ success: true, accessToken, user: { name: user.name, email: user.email } });
+        const email = profile.email.toLowerCase().trim();
+        const name = profile.name?.trim() || email.split("@")[0];
+        const user = await upsertOAuthUser({ email, name, providerField: "googleId", providerId: profile.providerId });
+        return await finishOAuthLogin(res, user);
     } catch (err) {
         console.error(err);
         return res.status(500).json({ success: false, message: "Google sign-in failure" });
+    }
+};
+
+//Sign in with Facebook. The frontend sends a Facebook user access token; we confirm it was issued to our
+//app (debug_token) and read the profile (Graph /me), then issue our own session.
+export const facebookLogin = async (req, res) => {
+    try {
+        const { access_token: accessToken } = req.body;
+        if (!accessToken || typeof accessToken !== "string") {
+            return res.status(400).json({ success: false, message: "Missing Facebook access token" });
+        }
+        if (!process.env.FACEBOOK_APP_ID || !process.env.FACEBOOK_APP_SECRET) {
+            console.error("FACEBOOK_APP_ID/FACEBOOK_APP_SECRET not set - cannot verify Facebook sign-in");
+            return res.status(500).json({ success: false, message: "Facebook sign-in is not configured" });
+        }
+
+        let profile;
+        try {
+            //debug_token (called with our app token) confirms the token is valid AND issued to our app
+            const appToken = `${process.env.FACEBOOK_APP_ID}|${process.env.FACEBOOK_APP_SECRET}`;
+            const debugRes = await fetch(`https://graph.facebook.com/debug_token?input_token=${encodeURIComponent(accessToken)}&access_token=${encodeURIComponent(appToken)}`);
+            const debug = await debugRes.json();
+            if (!debug?.data?.is_valid || String(debug.data.app_id) !== String(process.env.FACEBOOK_APP_ID)) {
+                throw new Error("invalid or foreign Facebook token");
+            }
+            const meRes = await fetch(`https://graph.facebook.com/me?fields=id,name,email&access_token=${encodeURIComponent(accessToken)}`);
+            profile = await meRes.json();
+            if (!meRes.ok || !profile?.id) throw new Error("Graph /me failed");
+        } catch {
+            return res.status(401).json({ success: false, message: "Invalid Facebook token" });
+        }
+
+        //Facebook only returns an email when the user granted it and has one on file. Without it we can't
+        //safely link/create the account, so steer them to another method.
+        if (!profile.email) {
+            return res.status(401).json({ success: false, message: "Facebook didn't share an email. Please use another sign-in method." });
+        }
+        const email = profile.email.toLowerCase().trim();
+        const name = profile.name?.trim() || email.split("@")[0];
+        const user = await upsertOAuthUser({ email, name, providerField: "facebookId", providerId: profile.id });
+        return await finishOAuthLogin(res, user);
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Facebook sign-in failure" });
     }
 };
 

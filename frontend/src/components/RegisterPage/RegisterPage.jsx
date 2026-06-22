@@ -4,7 +4,7 @@ import { BACKEND_BASE_URL } from '../../config.js';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { useNavigate } from 'react-router-dom';
-import GoogleAuthButton from '../utility/GoogleAuthButton.jsx';
+import SocialLogin from '../utility/SocialLogin.jsx';
 
 const registerSchema = Yup.object().shape({
     name: Yup.string().required("Name is required"),
@@ -114,10 +114,8 @@ function RegisterPage({ onLogin }) {
                         <hr style={{ flex: 1, borderColor: "#555" }} />
                     </div>
 
-                    <div className="d-flex justify-content-center">
-                        <GoogleAuthButton onLogin={onLogin} onError={setOauthError} />
-                    </div>
-                    {oauthError && <div className="text-danger small mt-2">{oauthError}</div>}
+                    <SocialLogin onLogin={onLogin} onError={setOauthError} />
+                    {oauthError && <div className="text-danger small mt-2 text-center">{oauthError}</div>}
                 </Card.Body>
             </Card>
         </div>

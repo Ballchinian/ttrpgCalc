@@ -5,19 +5,30 @@ import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { Link, useNavigate } from 'react-router-dom';
 import { setToken } from '../../auth';
-import GoogleAuthButton from '../utility/GoogleAuthButton.jsx';
+import SocialLogin from '../utility/SocialLogin.jsx';
 
 const loginSchema = Yup.object().shape({
     email: Yup.string().email("Invalid email").required("Email is required"),
     password: Yup.string().required("Password is required")
 });
 
-//Dark field + light text to match the app theme (default form-control renders dark text)
-const inputStyle = { background: "#222", color: "white", border: "1px solid #555" };
+const pageStyle = { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" };
+const cardStyle = { width: "100%", maxWidth: "380px" };
+const titleStyle = { fontSize: "28px", fontWeight: 700, color: "#fff", textAlign: "center", marginBottom: "4px" };
+const subtitleStyle = { fontSize: "13px", color: "var(--app-text)", opacity: 0.75, textAlign: "center", marginBottom: "22px" };
+const labelStyle = { fontSize: "13px", color: "var(--app-text)", marginBottom: "4px" };
+const rememberRowStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" };
+const linkBtnStyle = { background: "none", border: "none", padding: 0, color: "#f0ad4e", fontSize: "13px", cursor: "pointer" };
+const dividerRowStyle = { display: "flex", alignItems: "center", gap: "8px", margin: "18px 0" };
+const dividerLineStyle = { flex: 1, borderColor: "#34506e" };
+
+//Short pitch under the heading: tells a first-time visitor what the app does for them
+const APP_TAGLINE = "Build characters, simulate Pathfinder 2e encounters turn by turn, and see exactly where every point of damage comes from.";
 
 function LoginPage({ onLogin }) {
     const navigate = useNavigate();
     const [oauthError, setOauthError] = useState("");
+    const [remember, setRemember] = useState(true);
 
     const handleLogin = async (values, { setSubmitting, setErrors }) => {
         const { email, password } = values;
@@ -66,10 +77,11 @@ function LoginPage({ onLogin }) {
     };
 
     return (
-        <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
-            <Card className="d-flex justify-content-center align-items-center">
-                <Card.Body>
-                    <Card.Header className="m-2">Pathfinder Calculator Login</Card.Header>
+        <div style={pageStyle}>
+            <Card style={cardStyle}>
+                <Card.Body className="p-4">
+                    <h1 style={titleStyle}>TTRPG Calculator</h1>
+                    <p style={subtitleStyle}>{APP_TAGLINE}</p>
 
                     <Formik
                         initialValues={{ email: '', password: '' }}
@@ -78,53 +90,54 @@ function LoginPage({ onLogin }) {
                     >
                         {({ handleSubmit, handleChange, values, touched, errors, isSubmitting }) => (
                             <Form noValidate onSubmit={handleSubmit}>
-                                <Form.Group className="m-3" controlId="formEmail">
+                                <Form.Group className="mb-3" controlId="formEmail">
+                                    <Form.Label style={labelStyle}>Email</Form.Label>
                                     <Form.Control
-                                        type="email" name="email" placeholder="Email"
+                                        type="email" name="email" placeholder="Enter your email"
                                         value={values.email} onChange={handleChange}
                                         isInvalid={touched.email && !!errors.email}
-                                        style={inputStyle}
                                     />
                                     <Form.Control.Feedback type="invalid">{errors.email}</Form.Control.Feedback>
                                 </Form.Group>
 
-                                <Form.Group className="m-3" controlId="formPassword">
+                                <Form.Group className="mb-3" controlId="formPassword">
+                                    <Form.Label style={labelStyle}>Password</Form.Label>
                                     <Form.Control
-                                        type="password" name="password" placeholder="Password"
+                                        type="password" name="password" placeholder="Enter your password"
                                         value={values.password} onChange={handleChange}
                                         isInvalid={touched.password && !!errors.password}
-                                        style={inputStyle}
                                     />
                                     <Form.Control.Feedback type="invalid">{errors.password}</Form.Control.Feedback>
                                 </Form.Group>
 
-                                <Button className="m-1 mt-3" type="submit" variant="success" id="login_button" disabled={isSubmitting}>
-                                    Login
+                                <div style={rememberRowStyle}>
+                                    <Form.Check
+                                        type="checkbox" id="rememberMe" label="Remember me"
+                                        checked={remember} onChange={e => setRemember(e.target.checked)}
+                                        style={{ fontSize: "13px" }}
+                                    />
+                                    <button type="button" style={linkBtnStyle} onClick={handlePasswordReset}>Forgot Password?</button>
+                                </div>
+
+                                <Button type="submit" variant="success" className="w-100" id="login_button" disabled={isSubmitting}>
+                                    Sign In
                                 </Button>
                             </Form>
                         )}
                     </Formik>
 
-                    <div className="d-flex align-items-center my-3 px-3" style={{ gap: "8px" }}>
-                        <hr style={{ flex: 1, borderColor: "#555" }} />
+                    <div style={dividerRowStyle}>
+                        <hr style={dividerLineStyle} />
                         <span className="text-muted small">or</span>
-                        <hr style={{ flex: 1, borderColor: "#555" }} />
+                        <hr style={dividerLineStyle} />
                     </div>
 
-                    <div className="d-flex justify-content-center">
-                        <GoogleAuthButton onLogin={onLogin} onError={setOauthError} />
-                    </div>
-                    {oauthError && <div className="text-danger small mt-2">{oauthError}</div>}
+                    <SocialLogin onLogin={onLogin} onError={setOauthError} />
+                    {oauthError && <div className="text-danger small mt-1 text-center">{oauthError}</div>}
 
-                    <Button className="m-1 mt-3" type="button" variant="outline-secondary" onClick={handlePasswordReset}>
-                        Password Reset
-                    </Button>
-
-                    <div className="mt-4" id="new_account">
-                        <Link to="/register">
-                            <Button type="button" variant="secondary">
-                                ↪ Create a new account
-                            </Button>
+                    <div className="text-center mt-3">
+                        <Link to="/register" style={{ fontSize: "13px", color: "var(--app-text)" }}>
+                            New here? <span style={{ color: "#f0ad4e" }}>Create an account</span>
                         </Link>
                     </div>
                 </Card.Body>
