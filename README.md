@@ -153,23 +153,3 @@ Every resolved action is recorded in a round by round recap with damage dealt, h
 * **Frontend:** React 19, Vite, Zustand, React Router, Bootstrap
 * **Backend:** Node.js, Express, MongoDB (Mongoose), JSON Web Tokens, Cloudinary
 * **Testing:** Node's built-in test runner (backend), Vitest (frontend)
-
----
-
-# Running Locally
-
-The frontend and backend are independent packages, each with its own `.env` (see the `.env.example` in each directory).
-
-```sh
-# Backend (http://localhost:5000)
-cd backend
-npm install
-npm run dev
-
-# Frontend (http://localhost:3000)
-cd frontend
-npm install
-npm start
-```
-
-Run the test suites with `npm test` in either directory.
