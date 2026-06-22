@@ -5,12 +5,6 @@
 > The compare two battles should show the difference between the foes and the heroes. I want to know the total daamage of teh heros party. Not just the enemy.
 > Setup auth login For FB [med]
 > Setup auth login for Google [med]
-> index-mfHRLwnw.js:64 Failed to load game data: Error: Server error 404 on featureActions
-    at r (index-mfHRLwnw.js:64:99755)
-    at index-mfHRLwnw.js:64:100012
-    at async Promise.all (index 2)
-    at async fetchGameData (index-mfHRLwnw.js:64:99836)
-when i load the website through netliofy, local build is fine. 
 
 -- Ideas:
 > Add shield compatibility [small] 
