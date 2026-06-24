@@ -1,6 +1,6 @@
 {
   "type": "module",
-  "name": "pathfinder-backend",
+  "name": "ttrpg-backend",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {

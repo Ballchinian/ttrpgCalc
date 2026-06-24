@@ -29,7 +29,7 @@ function Navbar({ onLogout }) {
                     }}
                     onClick={() => navigate("/home")}
                 >
-                    Pathfinder Calculator
+                    TTRPG Calculator
                 </h4>
 
                 {/*Nav Links*/}

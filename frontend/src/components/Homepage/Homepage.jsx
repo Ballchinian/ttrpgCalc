@@ -9,10 +9,10 @@ import './Homepage.css';
 function Homepage() {
     return <div className="homepage">
         <div className="d-flex justify-content-center align-items-center">
-            <h1 className="text-center mt-5">Welcome to the Pathfinder 2e Calculator</h1>
+            <h1 className="text-center mt-5">Welcome to the TTRPG Calculator</h1>
         </div>
         
-        <p className="text-center mt-5">This is a simple calculator for tabletop players using pathfinder as a basis</p>
+        <p className="text-center mt-5">This is a simple calculator for tabletop RPG players</p>
 
   
         <div id="mainLinks" className="justify-content-center d-flex flex-wrap">

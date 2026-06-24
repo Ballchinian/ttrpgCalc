@@ -23,7 +23,7 @@ const dividerRowStyle = { display: "flex", alignItems: "center", gap: "8px", mar
 const dividerLineStyle = { flex: 1, borderColor: "#34506e" };
 
 //Short pitch under the heading: tells a first-time visitor what the app does for them
-const APP_TAGLINE = "Build characters, simulate Pathfinder 2e encounters turn by turn, and see exactly where every point of damage comes from.";
+const APP_TAGLINE = "Build characters, simulate tabletop RPG encounters turn by turn, and see exactly where every point of damage comes from.";
 
 function LoginPage({ onLogin }) {
     const navigate = useNavigate();

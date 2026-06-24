@@ -1,6 +1,6 @@
 # API Endpoints
 
-This document describes the Pathfinder 2e Combat Calculator backend API. All routes are prefixed with `/api`.
+This document describes the TTRPG Combat Calculator backend API. All routes are prefixed with `/api`.
 
 ## Authentication
 

@@ -1,6 +1,6 @@
-# Pathfinder 2e Combat Calculator
+# TTRPG Combat Calculator
 
-A web app for building Pathfinder Second Edition characters and running fights with them. You make your characters, give them weapons and spells, drop them into two parties, and play out an encounter turn by turn. The server does the actual rules work, the damage, conditions, saves, runes, and class features, so the numbers land the way the book says they should. You get a combat log and a round-by-round recap of how it all went.
+A web app for building tabletop RPG characters and running fights with them. You make your characters, give them weapons and spells, drop them into two parties, and play out an encounter turn by turn. The server does the actual rules work, the damage, conditions, saves, runes, and class features, so the numbers land the way the book says they should. You get a combat log and a round-by-round recap of how it all went.
 
 ## Features
 
