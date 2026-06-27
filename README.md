@@ -1,17 +1,17 @@
 # TTRPG Combat Calculator
 
-A web app for building tabletop RPG characters and running fights with them. You make your characters, give them weapons and spells, drop them into two parties, and play out an encounter turn by turn. The server does the actual rules work — the damage, conditions, saves, runes, and class features — so the numbers land the way the book says they should. You get a combat log and a round-by-round recap of how it all went.
+A web app for building tabletop RPG characters and running fights with them. You make your characters, give them weapons and spells, drop them into two parties, and play out an encounter turn by turn. The server does the actual rules work; the damage, conditions, saves, runes, and class features, so the numbers land the way the book says they should. You get a combat log and a round by round recap of how it all went.
 
 ## Features
 
 - Character builder: HP, AC, saves, skills, resistances, weaknesses, immunities, a class option, and a portrait you can upload and crop
 - Weapon and spell builder with traits, runes, critical specialization, versatile damage, saving throws, healing, and conditions
 - Import straight from Pathbuilder 2e (export code or pasted JSON) or Foundry VTT
-- Turn-based battle simulator: two parties, initiative tracking, action economy, and the multiple attack penalty
+- Turn based battle simulator: two parties, initiative tracking, action economy, and the multiple attack penalty
 - Three ways to resolve an action: averaged, rolled, or pick the outcome yourself
 - The PF2e rules that actually matter in a fight: resistance, weakness, immunity, the condition hierarchy, basic saves, persistent damage, off-guard, temporary HP
 - Class features and stances: Rage, Panache and Finishers, Sneak Attack, Hunt Prey, and more
-- Combat log, round-by-round recap, and a heads-up on conditions about to expire
+- Combat log, round by round recap, and a heads-up on conditions about to expire
 - Up to five saved battles per account
 - Accounts with proper session handling and email password reset
 
@@ -19,14 +19,14 @@ Endpoint docs live in [ENDPOINTS.md](./ENDPOINTS.md).
 
 ## How it works
 
-The server has the final say. The frontend never works out what an action does — it just sends who's acting, who they're hitting, and which action they picked. The backend looks the action back up from the database (so a client can't sneak in made-up effects), applies the bonuses and conditions, rolls or averages the dice, and hands back the updated combatants, a formatted log, and per-target stats.
+The server has the final say. The frontend never works out what an action does, it just sends who's acting, who they're hitting, and which action they picked. The backend looks the action back up from the database (so a client can't sneak in made-up effects), applies the bonuses and conditions, rolls or averages the dice, and hands back the updated combatants, a formatted log, and per target stats.
 
 Every action runs through the same steps:
 
 1. Apply the actor's offensive bonuses and each target's defensive ones.
-2. Turn the action into per-target effects: damage, healing, conditions, temp HP.
+2. Turn the action into per target effects: damage, healing, conditions, temp HP.
 3. Resolve each effect against the target's resistances, weaknesses, and immunities.
-4. Layer on class-feature riders (precision damage, stance bonuses) and critical specialization.
+4. Layer on class feature riders (precision damage, stance bonuses) and critical specialization.
 5. Build the log and stats, and return the updated combatants.
 
 ### Resolution modes
@@ -59,7 +59,7 @@ Conditions sit on each combatant with a value (when one applies) and a duration 
 
 Off-guard is tracked by where it came from. It sticks around as long as anything granting it (prone, grabbed, restrained, and so on) is still active, and clears once the last source is gone.
 
-Persistent damage lands at the end of each round, adjusted for resistance and weakness, followed by a recovery flat check (DC 15 by default). The same damage type doesn't stack — it keeps the higher value.
+Persistent damage lands at the end of each round, adjusted for resistance and weakness, followed by a recovery flat check (DC 15 by default). The same damage type doesn't stack, it keeps the higher value.
 
 ## Runes and item bonuses
 
@@ -91,7 +91,7 @@ Everyone, whatever their class, can Grapple, Trip, Demoralize, Stand, and Escape
 
 ## Accounts
 
-Accounts use short-lived access tokens with rotating refresh tokens.
+Accounts use short lived access tokens with rotating refresh tokens.
 
 - Passwords are hashed with bcrypt.
 - The access token is a JWT kept in memory and good for 15 minutes.
@@ -109,7 +109,7 @@ On a turn you choose an actor, an action, and the targets, then resolve. Action 
 
 Ending the round ticks every duration, applies persistent damage and its recovery checks, clears spent conditions, and gives everyone their actions back. Lost actions from slowed and stunned get applied here too.
 
-Every action you resolve goes into a round-by-round recap with the damage, healing, and condition changes. Save a battle (up to five) and you can load it back later.
+Every action you resolve goes into a round by round recap with the damage, healing, and condition changes. Save a battle (up to five) and you can load it back later.
 
 ## Tech stack
 
@@ -124,6 +124,6 @@ Every action you resolve goes into a round-by-round recap with the damage, heali
 3. Add them to a battle as heroes and foes.
 4. Roll initiative.
 5. On each turn, pick an actor, an action, and the targets.
-6. Resolve, and let the engine handle damage, conditions, and class-feature effects.
+6. Resolve, and let the engine handle damage, conditions, and class feature effects.
 7. End the round to tick durations and deal persistent damage.
 8. Read the recap, and save the battle if you want to come back to it.
